@@ -235,8 +235,16 @@ class WhatsAppChannel:
             )
         response.raise_for_status()
 
+    async def send_authentication_prompt(self, recipient: str, auth_url: str) -> None:
+        await self.send_text(
+            recipient,
+            "Por seguridad, primero verifica tu identidad en el enlace seguro de la institución:\n"
+            f"{auth_url}\n\n"
+            "No compartas códigos, claves ni datos sensibles por este chat.",
+        )
 
-def build_router(settings: Settings) -> APIRouter:
+
+def build_router(settings: Settings, auth_flow: Any | None = None) -> APIRouter:
     channel = WhatsAppChannel(settings)
 
     @router.get("/webhook")
@@ -263,6 +271,31 @@ def build_router(settings: Settings) -> APIRouter:
             if not channel.claim_message(message_id):
                 continue
             try:
+                if auth_flow is not None and channel.get_identity(sender) is None:
+                    pending = auth_flow.pending_challenge(sender, "whatsapp")
+                    if pending and text.strip().isdigit():
+                        try:
+                            auth_flow.verify_otp(pending.challenge_id, text.strip())
+                            await channel.send_text(
+                                sender,
+                                "Identidad verificada. Ya puedes continuar con tus consultas financieras.",
+                            )
+                        except HTTPException:
+                            await channel.send_text(
+                                sender,
+                                "El código no es válido o ya expiró. Usa nuevamente el enlace seguro para solicitar otro.",
+                            )
+                    else:
+                        try:
+                            challenge = auth_flow.start_challenge(sender, "whatsapp", "sms")
+                            await channel.send_authentication_prompt(sender, challenge.auth_url)
+                        except HTTPException:
+                            await channel.send_text(
+                                sender,
+                                "No pude encontrar una relación activa con este celular. Solicita atención a la institución.",
+                            )
+                    channel.complete_message(message_id)
+                    continue
                 answer = await channel.ask_dify(
                     sender,
                     text,

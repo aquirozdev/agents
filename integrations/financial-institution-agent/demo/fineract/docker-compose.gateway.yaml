@@ -14,15 +14,36 @@ services:
     environment:
       BANKING_ENVIRONMENT: development
       BANKING_CONNECTOR: fineract
-      BANKING_AUTH_MODE: static-demo
+      BANKING_AUTH_MODE: dify-user
       BANKING_GATEWAY_TOKEN: local-demo-token
       BANKING_DEMO_SUBJECT: ${FINERACT_DEMO_CLIENT_ID:-1}
-      BANKING_INSTITUTION_ID: fineract-demo
-      BANKING_INSTITUTION_NAME: Fineract Demo Institution
+      BANKING_INSTITUTION_ID: fineract-institution
+      BANKING_INSTITUTION_NAME: Institución Financiera
       BANKING_FINERACT_BASE_URL: https://fineract:8443/fineract-provider/api/v1
       BANKING_FINERACT_USERNAME: ${FINERACT_USERNAME:-mifos}
       BANKING_FINERACT_PASSWORD: ${FINERACT_USER_PASSWORD:-password}
       BANKING_FINERACT_TENANT: ${FINERACT_TENANT:-default}
       BANKING_FINERACT_VERIFY_TLS: 'false'
+      BANKING_AUTH_STATE_DB: /data/auth.sqlite3
+      BANKING_AUTH_BASE_URL: ${BANKING_AUTH_BASE_URL:-http://localhost:18080}
+      BANKING_AUTH_VERIFICATION_MODE: ${BANKING_AUTH_VERIFICATION_MODE:-local-acceptance}
+      BANKING_AUTH_IDENTITY_SECRET: ${BANKING_AUTH_IDENTITY_SECRET:-local-auth-identity-secret}
+      BANKING_DIFY_IDENTITY_SECRET: ${BANKING_DIFY_IDENTITY_SECRET:-local-dify-identity-secret}
+      BANKING_WHATSAPP_IDENTITY_SECRET: ${BANKING_WHATSAPP_IDENTITY_SECRET:-local-auth-identity-secret}
+      BANKING_DIFY_BASE_URL: ${BANKING_DIFY_BASE_URL:-http://api:5001}
+      BANKING_DIFY_API_KEY: ${BANKING_DIFY_API_KEY:-}
     ports:
-      - '${BANKING_GATEWAY_PORT:-8080}:8080'
+      - '${BANKING_GATEWAY_PORT:-18080}:8080'
+    volumes:
+      - fineract-gateway-state:/data
+    networks:
+      - default
+      - dify
+
+networks:
+  dify:
+    external: true
+    name: docker_default
+
+volumes:
+  fineract-gateway-state:

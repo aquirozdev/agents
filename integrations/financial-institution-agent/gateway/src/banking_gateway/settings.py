@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str | None = None
     whatsapp_graph_api_version: str = "v23.0"
     whatsapp_state_db: str = "/data/whatsapp.sqlite3"
+    auth_state_db: str = "/data/auth.sqlite3"
+    auth_base_url: str = "http://localhost:8080"
+    auth_challenge_ttl_seconds: int = 300
+    auth_session_ttl_seconds: int = 900
+    auth_step_up_ttl_seconds: int = 300
+    auth_verification_mode: Literal["local-acceptance", "institution"] = "local-acceptance"
+    auth_identity_secret: str = "local-auth-identity-secret"
+    auth_customer_directory: str = ""
     dify_base_url: str | None = None
     dify_api_key: str | None = None
     dify_application_user_prefix: str = "whatsapp"
@@ -89,6 +97,12 @@ def validate_runtime_settings(settings: Settings) -> None:
         errors.append("BANKING_INSTITUTION_CONFIG is required in production")
     if settings.gateway_token == "local-demo-token":
         errors.append("BANKING_GATEWAY_TOKEN must be replaced in production")
+    if settings.auth_verification_mode == "local-acceptance":
+        errors.append("BANKING_AUTH_VERIFICATION_MODE=local-acceptance is not allowed in production")
+    if settings.auth_identity_secret == "local-auth-identity-secret":
+        errors.append("BANKING_AUTH_IDENTITY_SECRET must be replaced in production")
+    if settings.auth_challenge_ttl_seconds <= 0 or settings.auth_session_ttl_seconds <= 0:
+        errors.append("authentication TTLs must be positive")
     if settings.connector == "custom" and not settings.connector_factory:
         errors.append("BANKING_CONNECTOR_FACTORY is required for a production custom connector")
     if settings.connector == "canonical-http":

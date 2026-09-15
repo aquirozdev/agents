@@ -14,6 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .auth import TokenVerifier
+from .auth_flow import AuthFlow, build_auth_router
 from .audit import record_request
 from .demo_connector import DemoConnector
 from .institution import InstitutionProfile, load_institution_profile
@@ -126,6 +127,7 @@ def validate_connector(candidate: BankingConnector) -> None:
 
 connector = load_connector(settings)
 verifier = TokenVerifier(settings)
+auth_flow = AuthFlow(settings, connector)
 Authenticated = Annotated[AuthContext, Depends(verifier.verify)]
 PrivateAuthenticated = Annotated[AuthContext, Depends(verifier.verify_private)]
 
@@ -147,7 +149,8 @@ app = FastAPI(
     redoc_url=None if settings.environment == "production" else "/redoc",
     openapi_url=None if settings.environment == "production" else "/openapi.json",
 )
-app.include_router(build_router(settings))
+app.include_router(build_auth_router(settings, auth_flow))
+app.include_router(build_router(settings, auth_flow))
 
 
 @app.middleware("http")

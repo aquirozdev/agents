@@ -5,6 +5,7 @@ small read-only subset of Fineract resources into the same models used by any
 institution connector. It is not required by the reusable agent template.
 """
 
+import re
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -101,6 +102,32 @@ class FineractConnector:
             return int(customer_id)
         except ValueError as exc:
             raise ResourceNotFoundError("Customer not found") from exc
+
+    def resolve_customer_identifier(self, identifier: str) -> str | None:
+        """Resolve a registered mobile, email or external id to a Fineract client."""
+
+        normalized = self._normalize_identifier(identifier)
+        if not normalized:
+            return None
+        raw = self._get("clients", {"limit": 200})
+        items = raw.get("pageItems", []) if isinstance(raw, dict) else raw
+        for client in items or []:
+            candidates = (
+                client.get("mobileNo"),
+                client.get("emailAddress"),
+                client.get("externalId"),
+            )
+            if any(self._normalize_identifier(value) == normalized for value in candidates if value):
+                client_id = client.get("id")
+                return str(client_id) if client_id is not None else None
+        return None
+
+    @staticmethod
+    def _normalize_identifier(value: Any) -> str:
+        text = str(value or "").strip().lower()
+        if "@" in text:
+            return text
+        return re.sub(r"[^0-9]", "", text)
 
     def _account_id(self, account_id: str) -> int:
         try:

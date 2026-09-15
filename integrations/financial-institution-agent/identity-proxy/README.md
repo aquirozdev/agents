@@ -30,7 +30,7 @@ Para el canal WhatsApp integrado con Dify, configura además un relay firmado:
 
 ```bash
 IDENTITY_PROXY_DIFY_RELAY_SECRET=the-same-secret-as-BANKING_DIFY_IDENTITY_SECRET
-IDENTITY_PROXY_IDENTITY_ASSERTION_SECRET=the-same-secret-as-BANKING_WHATSAPP_IDENTITY_SECRET
+IDENTITY_PROXY_IDENTITY_ASSERTION_SECRET=the-same-secret-as-BANKING_AUTH_IDENTITY_SECRET
 ```
 
 La primera firma demuestra que Dify transportó la identidad persistida y la

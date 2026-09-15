@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import hmac
 from pathlib import Path
@@ -267,6 +268,37 @@ def test_dify_user_cannot_promote_itself_to_private_access() -> None:
     with pytest.raises(Exception) as error:
         verifier.verify_private(request)
     assert getattr(error.value, "status_code", None) == 403
+
+
+def test_local_dify_user_assertion_can_create_a_verified_private_session() -> None:
+    settings = Settings(
+        auth_mode="dify-user",
+        gateway_token="gateway-secret",
+        dify_identity_secret="identity-secret",
+        auth_verification_mode="local-acceptance",
+        auth_identity_secret="auth-secret",
+    )
+    verifier = TokenVerifier(settings)
+    subject = "101"
+    expires_at = 4_000_000_000
+    encoded_subject = base64.urlsafe_b64encode(subject.encode()).decode().rstrip("=")
+    assertion = "banking:v1:" + encoded_subject + ":" + str(expires_at) + ":" + hmac.new(
+        b"auth-secret", f"{subject}|{expires_at}".encode(), hashlib.sha256
+    ).hexdigest()
+    request = SimpleNamespace(
+        headers={
+            "Authorization": "Bearer gateway-secret",
+            "X-Dify-End-User-ID": assertion,
+            "X-Dify-End-User-Signature": "sha256="
+            + hmac.new(b"identity-secret", assertion.encode(), hashlib.sha256).hexdigest(),
+        },
+        state=SimpleNamespace(correlation_id="corr-4"),
+    )
+
+    context = verifier.verify_private(request)
+
+    assert context.subject == subject
+    assert context.session_state == "VERIFIED"
 
 
 def test_external_proxy_must_authenticate_and_supply_verified_state() -> None:

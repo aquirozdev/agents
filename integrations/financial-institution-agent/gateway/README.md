@@ -82,6 +82,25 @@ inyectar `VERIFIED`; nunca se solicita una clave, PIN, CVV u OTP por este
 adaptador. En varias réplicas, reemplaza SQLite por un store compartido y añade
 deduplicación persistente por `message_id` antes de producción.
 
+## Flujo local de autenticación
+
+El gateway incluye una página segura en `/channels/auth` para ensayar el
+recorrido de web y WhatsApp. `POST /channels/auth/start` resuelve un cliente
+por celular, correo o identificador externo usando el conector institucional;
+`POST /channels/auth/verify-otp` crea una sesión `VERIFIED`; y los endpoints
+`/biometric/start` y `/biometric/complete` realizan el step-up del dispositivo.
+
+En `BANKING_AUTH_VERIFICATION_MODE=local-acceptance`, cualquier código de seis
+dígitos y cualquier assertion no vacío son aceptados para que la presentación
+sea reproducible. Este modo se rechaza durante el arranque en producción. La
+integración productiva debe reemplazarlo por el proveedor OTP de la institución
+y un verificador WebAuthn/passkey, conservando el mismo contrato de sesión.
+
+El seed de Fineract registra los celulares de los clientes y el conector los
+resuelve sin pedir `customerId` al usuario. Configura
+`BANKING_AUTH_BASE_URL` con la URL pública del gateway cuando WhatsApp deba
+abrir el enlace desde un teléfono.
+
 ## Conectar una institución real
 
 Implementa `BankingConnector` en un paquete privado del integrador y expón una

@@ -21,22 +21,30 @@ docker compose \
   up --build
 ```
 
-El gateway queda en `http://localhost:8080`; usa `local-demo-token` solo para
-pruebas locales. Primero crea y carga en Fineract un cliente, una cuenta, un
-producto y, si aplica, un crédito. Los identificadores canónicos de la demo
-son los identificadores numéricos de Fineract.
+El gateway queda en `http://localhost:8080` y usa identidad dinámica firmada
+para resolver el cliente autenticado. Primero crea y carga en Fineract los
+clientes, cuentas y productos. Los identificadores internos son numéricos,
+pero el usuario se resuelve por el celular, correo o identificador externo y
+no debe escribir un `customerId` para autenticarse.
 
-Para crear de forma reproducible un cliente, un producto de ahorro y una
-cuenta sintética, ejecuta desde este directorio:
+Configura la aplicación Dify con `forward_end_user_identity=true` y el mismo
+secreto de relay que usa el gateway. Para ensayar el acceso web abre
+`http://localhost:8080/channels/auth`, verifica uno de los celulares cargados
+y continúa al chat protegido.
+
+Para crear de forma reproducible los clientes, un producto de ahorro y una
+cuenta para cada cliente, ejecuta desde este directorio:
 
 ```bash
 ./seed-demo.sh
 ```
 
-El script es idempotente por `FINERACT_CLIENT_EXTERNAL_ID` y
-`FINERACT_PRODUCT_SHORT_NAME`; requiere `curl` y `jq`, acepta las variables
+El script es idempotente por el identificador externo de cada cliente y por
+`FINERACT_PRODUCT_SHORT_NAME`. Requiere `curl` y `jq`, acepta las variables
 `FINERACT_BASE_URL`, `FINERACT_USERNAME`, `FINERACT_PASSWORD` y
-`FINERACT_TENANT`, e imprime el `FINERACT_DEMO_CLIENT_ID` que debe pasarse al
-gateway. No crea créditos ni ejecuta depósitos.
+`FINERACT_TENANT`, e imprime los identificadores de clientes y cuentas creados.
+La lista se puede reemplazar con `FINERACT_CLIENTS`, usando el formato
+`external-id|nombre|apellido|celular|correo`, separado por punto y coma; el
+correo es opcional. No crea créditos ni ejecuta depósitos.
 
 La imagen oficial de desarrollo y sus perfiles de prueba no deben promocionarse directamente a producción. La instalación productiva debe fijar una versión aprobada, usar secretos externos, TLS válido, roles mínimos, auditoría, backups y hardening institucional.

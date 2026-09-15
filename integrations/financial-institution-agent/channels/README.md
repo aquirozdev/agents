@@ -13,6 +13,19 @@ El adaptador valida la firma HMAC, deduplica `message_id`, conserva el
 `conversation_id` de Dify y responde por el número institucional. No contiene
 reglas del core bancario.
 
+Cuando el flujo institucional está habilitado, un remitente no verificado no
+se reenvía a Dify. El gateway crea un reto asociado al celular del remitente y
+envía un enlace de autenticación a `/channels/auth`. La página permite validar
+el OTP y completar el segundo factor del dispositivo; al terminar, la sesión
+se registra en el mismo store de identidades que usa el adaptador de WhatsApp.
+El siguiente mensaje del cliente ya se reenvía con `session_state=VERIFIED`.
+
+Para el canal web, el cliente debe usar el `identityAssertion` devuelto por
+`POST /channels/auth/verify-otp` como `user` de la API de aplicación Dify, con
+`forward_end_user_identity=true` habilitado. El assertion es de corta duración
+y el proxy institucional valida su firma antes de escribir las cabeceras
+confiables del gateway.
+
 Cuando Dify se configura con `forward_end_user_identity`, el gateway recibe el
 `external_user_id` del canal como identidad dinámica. El conector de la
 institución debe relacionarlo con su cliente y comprobar si la sesión tiene

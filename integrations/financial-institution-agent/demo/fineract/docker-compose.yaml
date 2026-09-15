@@ -13,7 +13,7 @@ services:
       FINERACT_TENANTS_DB_NAME: fineract_tenants
       FINERACT_TENANT_DEFAULT_DB_NAME: fineract_default
     volumes:
-      - fineract-demo-db:/var/lib/postgresql/data
+      - fineract-demo-db:/var/lib/postgresql
       - ./postgres-init.sh:/docker-entrypoint-initdb.d/01-fineract-init.sh:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U root -d postgres']
@@ -22,7 +22,7 @@ services:
       retries: 20
 
   fineract:
-    image: apache/fineract:${FINERACT_VERSION:-1.15.0}
+    image: apache/fineract:${FINERACT_VERSION:-3597c668fad621ac4783725e96396153c7d6e9c0}
     depends_on:
       db:
         condition: service_healthy
@@ -47,7 +47,7 @@ services:
       FINERACT_CONTENT_FILESYSTEM_ROOT_FOLDER: /tmp
       SPRING_PROFILES_ACTIVE: test,diagnostics
     ports:
-      - '${FINERACT_PORT:-8443}:8443'
+      - '${FINERACT_PORT:-18443}:8443'
     healthcheck:
       test: ['CMD-SHELL', 'nc -z localhost 8443']
       interval: 10s
