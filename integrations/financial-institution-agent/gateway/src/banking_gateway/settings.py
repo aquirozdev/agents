@@ -54,8 +54,12 @@ class Settings(BaseSettings):
     auth_session_ttl_seconds: int = 900
     auth_step_up_ttl_seconds: int = 300
     auth_verification_mode: Literal["local-acceptance", "institution"] = "local-acceptance"
+    auth_otp_provider: Literal["local-acceptance", "twilio-verify"] = "local-acceptance"
     auth_identity_secret: str = "local-auth-identity-secret"
     auth_customer_directory: str = ""
+    twilio_account_sid: str | None = None
+    twilio_auth_token: str | None = None
+    twilio_verify_service_sid: str | None = None
     dify_base_url: str | None = None
     dify_api_key: str | None = None
     dify_public_api_key: str | None = None
@@ -104,6 +108,12 @@ def validate_runtime_settings(settings: Settings) -> None:
         errors.append("BANKING_PUBLIC_GATEWAY_TOKEN must be replaced in production")
     if settings.auth_verification_mode == "local-acceptance":
         errors.append("BANKING_AUTH_VERIFICATION_MODE=local-acceptance is not allowed in production")
+    if settings.auth_otp_provider == "local-acceptance":
+        errors.append("BANKING_AUTH_OTP_PROVIDER=local-acceptance is not allowed in production")
+    if settings.auth_otp_provider == "twilio-verify" and not all(
+        (settings.twilio_account_sid, settings.twilio_auth_token, settings.twilio_verify_service_sid)
+    ):
+        errors.append("Twilio Verify credentials are required when BANKING_AUTH_OTP_PROVIDER=twilio-verify")
     if settings.auth_identity_secret == "local-auth-identity-secret":
         errors.append("BANKING_AUTH_IDENTITY_SECRET must be replaced in production")
     if settings.auth_challenge_ttl_seconds <= 0 or settings.auth_session_ttl_seconds <= 0:

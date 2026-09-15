@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from .settings import Settings
+from .otp import OtpProvider, OtpProviderError, build_otp_provider
 
 
 AuthChannel = Literal["web", "whatsapp"]
@@ -77,9 +78,10 @@ class AuthFlow:
     are accepted. That mode is rejected by production configuration validation.
     """
 
-    def __init__(self, settings: Settings, connector: Any) -> None:
+    def __init__(self, settings: Settings, connector: Any, otp_provider: OtpProvider | None = None) -> None:
         self.settings = settings
         self.connector = connector
+        self.otp_provider = otp_provider or build_otp_provider(settings)
 
     def _connect(self) -> sqlite3.Connection:
         Path(self.settings.auth_state_db).parent.mkdir(parents=True, exist_ok=True)
@@ -142,6 +144,13 @@ class AuthFlow:
         now = int(time.time())
         expires_at = now + self.settings.auth_challenge_ttl_seconds
         recipient = self.normalize_identifier(identifier)
+        try:
+            self.otp_provider.send_code(recipient, delivery)
+        except OtpProviderError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The verification code could not be sent",
+            ) from exc
         with closing(self._connect()) as db:
             db.execute(
                 "INSERT INTO auth_challenges "
@@ -202,8 +211,24 @@ class AuthFlow:
             if attempts > 5:
                 raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many verification attempts")
             db.execute("UPDATE auth_challenges SET attempts = ? WHERE challenge_id = ?", (attempts, challenge_id))
-            if self.settings.auth_verification_mode != "local-acceptance":
-                raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Institution OTP provider is not configured")
+            db.commit()
+
+        try:
+            verified = self.otp_provider.check_code(str(row["recipient"]), str(row["delivery"]), code)
+        except OtpProviderError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The verification service is unavailable",
+            ) from exc
+        if not verified:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid verification code")
+
+        with closing(self._connect()) as db:
+            current = db.execute(
+                "SELECT used, expires_at FROM auth_challenges WHERE challenge_id = ?", (challenge_id,)
+            ).fetchone()
+            if not current or int(current["used"]) or int(current["expires_at"]) <= now:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="The verification challenge expired")
             db.execute("UPDATE auth_challenges SET used = 1 WHERE challenge_id = ?", (challenge_id,))
             token = secrets.token_urlsafe(48)
             token_hash = self._hash_token(token)

@@ -16,13 +16,36 @@ class DirectoryConnector:
         }.get(identifier)
 
 
-def make_flow(tmp_path) -> AuthFlow:
+def make_flow(tmp_path, otp_provider=None) -> AuthFlow:
     settings = Settings(
         auth_state_db=str(tmp_path / "auth.sqlite3"),
         whatsapp_state_db=str(tmp_path / "whatsapp.sqlite3"),
         auth_base_url="https://bank.example",
     )
-    return AuthFlow(settings, DirectoryConnector())
+    return AuthFlow(settings, DirectoryConnector(), otp_provider=otp_provider)
+
+
+class FakeOtpProvider:
+    def __init__(self, valid_code: str = "123456") -> None:
+        self.valid_code = valid_code
+        self.sent: list[tuple[str, str]] = []
+
+    def send_code(self, recipient: str, delivery: str) -> None:
+        self.sent.append((recipient, delivery))
+
+    def check_code(self, recipient: str, delivery: str, code: str) -> bool:
+        return code == self.valid_code
+
+
+def test_external_otp_provider_sends_and_checks_the_resolved_recipient(tmp_path) -> None:
+    provider = FakeOtpProvider(valid_code="654321")
+    flow = make_flow(tmp_path, otp_provider=provider)
+
+    challenge = flow.start_challenge("+593 999 292 849", "web", "sms")
+    session = flow.verify_otp(challenge.challenge_id, "654321")
+
+    assert provider.sent == [("593999292849", "sms")]
+    assert session.subject == "101"
 
 
 def test_otp_creates_verified_session_for_the_resolved_customer(tmp_path) -> None:

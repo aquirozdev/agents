@@ -27,6 +27,23 @@ clientes, cuentas y productos. Los identificadores internos son numéricos,
 pero el usuario se resuelve por el celular, correo o identificador externo y
 no debe escribir un `customerId` para autenticarse.
 
+Para reemplazar el OTP local por SMS real de Twilio Verify durante la demo,
+define estas variables antes de recrear el gateway:
+
+```bash
+export BANKING_AUTH_OTP_PROVIDER=twilio-verify
+export BANKING_TWILIO_ACCOUNT_SID=AC...
+export BANKING_TWILIO_AUTH_TOKEN='secret-manager-value'
+export BANKING_TWILIO_VERIFY_SERVICE_SID=VA...
+docker compose -p docker \
+  -f docker-compose.yaml \
+  -f docker-compose.gateway.yaml \
+  up -d --build gateway
+```
+
+En una cuenta Trial, verifica en Twilio los celulares de prueba antes de
+iniciar el flujo; Twilio limita los mensajes a destinatarios verificados.
+
 Configura la aplicación Dify con `forward_end_user_identity=true` y el mismo
 secreto de relay que usa el gateway. Para ensayar el acceso web abre
 `http://localhost:8080/channels/auth`, verifica uno de los celulares cargados

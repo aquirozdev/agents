@@ -103,6 +103,20 @@ sea reproducible. Este modo se rechaza durante el arranque en producción. La
 integración productiva debe reemplazarlo por el proveedor OTP de la institución
 y un verificador WebAuthn/passkey, conservando el mismo contrato de sesión.
 
+Para probar OTP real con Twilio Verify v2, crea un Verification Service en
+Twilio y exporta sus credenciales únicamente en el entorno de ejecución:
+
+```bash
+export BANKING_AUTH_OTP_PROVIDER=twilio-verify
+export BANKING_TWILIO_ACCOUNT_SID=AC...
+export BANKING_TWILIO_AUTH_TOKEN='secret-manager-value'
+export BANKING_TWILIO_VERIFY_SERVICE_SID=VA...
+```
+
+El gateway envía el código en formato E.164 y valida el resultado con
+`VerificationCheck`; nunca genera ni almacena el OTP. En una cuenta Trial de
+Twilio debes verificar previamente cada número destinatario.
+
 El seed de Fineract registra los celulares de los clientes y el conector los
 resuelve sin pedir `customerId` al usuario. Configura
 `BANKING_AUTH_BASE_URL` con la URL pública del gateway cuando WhatsApp deba

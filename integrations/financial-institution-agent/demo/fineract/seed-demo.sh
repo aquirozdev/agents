@@ -45,8 +45,8 @@ wait_for_core
 
 products_response="$(api GET "savingsproducts?limit=100")"
 product_id="$(jq -r --arg short_name "$FINERACT_PRODUCT_SHORT_NAME" '
-  [.pageItems[]? | select(.shortName == $short_name) | .id][0] //
-  ([.[]? | select(.shortName == $short_name) | .id][0] // empty)
+  [((if type == "object" then .pageItems else . end)[]?
+    | select(.shortName == $short_name) | .id)][0] // empty
 ' <<<"$products_response")"
 
 if [[ -z "$product_id" ]]; then

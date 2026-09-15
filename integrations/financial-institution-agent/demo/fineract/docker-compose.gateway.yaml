@@ -27,8 +27,12 @@ services:
       BANKING_AUTH_STATE_DB: /data/auth.sqlite3
       BANKING_AUTH_BASE_URL: ${BANKING_AUTH_BASE_URL:-http://localhost:18080}
       BANKING_AUTH_VERIFICATION_MODE: ${BANKING_AUTH_VERIFICATION_MODE:-local-acceptance}
+      BANKING_AUTH_OTP_PROVIDER: ${BANKING_AUTH_OTP_PROVIDER:-local-acceptance}
       BANKING_AUTH_IDENTITY_SECRET: ${BANKING_AUTH_IDENTITY_SECRET:-local-auth-identity-secret}
       BANKING_DIFY_IDENTITY_SECRET: ${BANKING_DIFY_IDENTITY_SECRET:-local-dify-identity-secret}
+      BANKING_TWILIO_ACCOUNT_SID: ${BANKING_TWILIO_ACCOUNT_SID:-}
+      BANKING_TWILIO_AUTH_TOKEN: ${BANKING_TWILIO_AUTH_TOKEN:-}
+      BANKING_TWILIO_VERIFY_SERVICE_SID: ${BANKING_TWILIO_VERIFY_SERVICE_SID:-}
       BANKING_WHATSAPP_IDENTITY_SECRET: ${BANKING_WHATSAPP_IDENTITY_SECRET:-local-auth-identity-secret}
       BANKING_DIFY_BASE_URL: ${BANKING_DIFY_BASE_URL:-http://api:5001}
       BANKING_DIFY_API_KEY: ${BANKING_DIFY_API_KEY:-}
@@ -37,8 +41,12 @@ services:
     volumes:
       - fineract-gateway-state:/data
     networks:
-      - default
-      - dify
+      default:
+        aliases:
+          - banking-gateway
+      dify:
+        aliases:
+          - banking-gateway
 
 networks:
   dify:
