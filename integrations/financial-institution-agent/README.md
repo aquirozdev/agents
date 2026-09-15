@@ -40,6 +40,8 @@ consume desde WhatsApp, webchat u otro canal.
 - `gateway/`: gateway ejecutable de referencia con conector demo intercambiable.
 - `identity-proxy/`: proxy OIDC/JWT de referencia para validar identidad y assurance antes del gateway.
 - `channels/`: adaptación de canales, incluido WhatsApp Cloud API opcional.
+- `demo/COMMERCIAL_DEMO.md`: recorrido reproducible para probar el chat comercial con Dify y Cloudflare.
+- `demo/docker-compose.dify.yaml`: conecta el gateway demo a la red Docker local de Dify.
 - `PRODUCTION_READINESS.md`: matriz de lo que ya incluye la plantilla y lo que debe aportar cada institución.
 - `demo/fineract/`: entorno opcional de referencia para pruebas locales; no es la arquitectura productiva.
 - `.env.example`: parámetros no sensibles del gateway de una institución.

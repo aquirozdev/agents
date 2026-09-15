@@ -53,6 +53,20 @@ def test_private_routes_require_bearer_token() -> None:
     assert response.headers["content-type"].startswith("application/problem+json")
 
 
+def test_local_demo_publishes_commercial_capabilities() -> None:
+    response = client.get("/v1/capabilities", headers=AUTH)
+    assert response.status_code == 200
+    capabilities = response.json()
+    assert capabilities["customerProfile"] is True
+    assert capabilities["accounts"] is True
+    assert capabilities["accountTransactions"] is True
+    assert capabilities["loans"] is True
+    assert capabilities["loanApplications"] is True
+    assert capabilities["cards"] is True
+    assert capabilities["transfers"] is False
+    assert capabilities["payments"] is False
+
+
 def test_demo_customer_accounts_follow_canonical_shape() -> None:
     response = client.get("/v1/customers/customer-demo-001/accounts", headers=AUTH)
     assert response.status_code == 200

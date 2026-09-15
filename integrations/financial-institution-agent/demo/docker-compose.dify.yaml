@@ -1,0 +1,49 @@
+name: banking-agent-dify-demo
+
+services:
+  banking-gateway:
+    build:
+      context: ../gateway
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    ports:
+      - '${BANKING_GATEWAY_PORT:-8080}:8080'
+    environment:
+      BANKING_ENVIRONMENT: development
+      BANKING_INSTITUTION_ID: ${BANKING_INSTITUTION_ID:-cooperative-demo}
+      BANKING_INSTITUTION_NAME: ${BANKING_INSTITUTION_NAME:-Cooperativa Demo}
+      BANKING_CONNECTOR: demo
+      BANKING_AUTH_MODE: static-demo
+      BANKING_GATEWAY_TOKEN: ${BANKING_GATEWAY_TOKEN:-local-demo-token}
+      BANKING_DEMO_SUBJECT: ${BANKING_DEMO_SUBJECT:-customer-demo-001}
+      BANKING_REQUIRE_VERIFIED_SESSION_FOR_PRIVATE_DATA: 'true'
+      BANKING_WHATSAPP_ENABLED: 'false'
+    volumes:
+      - banking-demo-state:/data
+    networks:
+      default:
+        aliases:
+          - banking-gateway
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/v1/health')",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  default:
+    external: true
+    name: docker_default
+
+volumes:
+  banking-demo-state:

@@ -30,10 +30,11 @@ def load_institution_profile(settings: Settings) -> InstitutionProfile:
             locale=settings.institution_locale,
             timezone=settings.institution_timezone,
             currency=settings.institution_currency,
-            # The local demo exposes the read-only card surface so the
-            # canonical contract can be exercised without an institution
-            # policy file. A real deployment must provide institution.yaml;
-            # its explicit capability matrix remains the source of truth.
+            # The local demo exposes the common read-only and pending-request
+            # surfaces plus cards so the commercial conversation can be
+            # exercised without an institution policy file. A real deployment
+            # must provide institution.yaml; its explicit capability matrix
+            # remains the source of truth.
             capabilities=Capabilities(cards=True),
             require_verified_session_for_private_data=settings.require_verified_session_for_private_data,
             verified_session_state_header=settings.verified_session_state_header,
