@@ -83,16 +83,19 @@ Configura en Meta el webhook `https://gateway.example.com/channels/whatsapp/webh
 El adaptador valida `X-Hub-Signature-256`, conserva el `conversation_id` de
 Dify en SQLite y envía cada mensaje al agente con `session_state=PUBLIC`. Para
 consultas privadas, el broker puede registrar la sesión firmando un `POST
-/channels/whatsapp/identity` con `BANKING_WHATSAPP_IDENTITY_SECRET`. El
-adaptador genera una aserción corta que el `identity-proxy` valida antes de
-inyectar `VERIFIED`; nunca se solicita una clave, PIN, CVV u OTP por este
-adaptador. En varias réplicas, reemplaza SQLite por un store compartido y añade
-deduplicación persistente por `message_id` antes de producción.
+/channels/whatsapp/identity` con `BANKING_WHATSAPP_IDENTITY_SECRET`. Escribe
+`autenticar` en WhatsApp para recibir el OTP por SMS y responde con el código
+en el mismo chat; no se necesita abrir una página web. El adaptador genera una
+aserción corta que el `identity-proxy` valida antes de inyectar `VERIFIED`; nunca
+se solicita una clave, PIN o CVV por este adaptador. En varias réplicas,
+reemplaza SQLite por un store compartido y añade deduplicación persistente por
+`message_id` antes de producción.
 
 ## Flujo local de autenticación
 
-El gateway incluye una página segura en `/channels/auth` para ensayar el
-recorrido de web y WhatsApp. `POST /channels/auth/start` resuelve un cliente
+El gateway incluye una página segura opcional en `/channels/auth` para ensayar
+el recorrido web. En WhatsApp, escribe `autenticar`, recibe el SMS y responde
+con el código de seis dígitos en el mismo chat. `POST /channels/auth/start` resuelve un cliente
 por celular, correo o identificador externo usando el conector institucional;
 `POST /channels/auth/verify-otp` crea una sesión `VERIFIED`; y los endpoints
 `/biometric/start` y `/biometric/complete` realizan el step-up del dispositivo.
@@ -118,9 +121,9 @@ El gateway envía el código en formato E.164 y valida el resultado con
 Twilio debes verificar previamente cada número destinatario.
 
 El seed de Fineract registra los celulares de los clientes y el conector los
-resuelve sin pedir `customerId` al usuario. Configura
-`BANKING_AUTH_BASE_URL` con la URL pública del gateway cuando WhatsApp deba
-abrir el enlace desde un teléfono.
+resuelve sin pedir `customerId` al usuario. `BANKING_AUTH_BASE_URL` solo es
+necesario para el recorrido web; WhatsApp no necesita abrir un enlace para
+completar el OTP.
 
 ## Conectar una institución real
 

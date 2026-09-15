@@ -251,12 +251,12 @@ class WhatsAppChannel:
             )
         response.raise_for_status()
 
-    async def send_authentication_prompt(self, recipient: str, auth_url: str) -> None:
+    async def send_authentication_prompt(self, recipient: str) -> None:
         await self.send_text(
             recipient,
-            "Por seguridad, primero verifica tu identidad en el enlace seguro de la institución:\n"
-            f"{auth_url}\n\n"
-            "No compartas códigos, claves ni datos sensibles por este chat.",
+            "Por seguridad, te enviamos un código de verificación por SMS. "
+            "Responde aquí con el código de 6 dígitos para continuar. "
+            "No compartas códigos, claves ni datos sensibles con nadie.",
         )
 
 
@@ -300,14 +300,14 @@ def build_router(settings: Settings, auth_flow: Any | None = None) -> APIRouter:
                         except HTTPException:
                             await channel.send_text(
                                 sender,
-                                "El código no es válido o ya expiró. Usa nuevamente el enlace seguro para solicitar otro.",
+                                "El código no es válido o ya expiró. Escribe autenticar para solicitar otro.",
                             )
                         channel.complete_message(message_id)
                         continue
                     if normalized_text in {"autenticar", "verificar", "iniciar sesión", "iniciar sesion"}:
                         try:
                             challenge = auth_flow.start_challenge(sender, "whatsapp", "sms")
-                            await channel.send_authentication_prompt(sender, challenge.auth_url)
+                            await channel.send_authentication_prompt(sender)
                         except HTTPException:
                             await channel.send_text(
                                 sender,
