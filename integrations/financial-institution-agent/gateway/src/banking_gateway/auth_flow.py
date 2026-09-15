@@ -303,7 +303,8 @@ class AuthFlow:
         self, session_token: str, message: str, conversation_id: str | None = None
     ) -> dict[str, Any]:
         session = self.session(session_token)
-        if not self.settings.dify_base_url or not self.settings.dify_api_key:
+        api_key = self.settings.dify_customer_api_key or self.settings.dify_api_key
+        if not self.settings.dify_base_url or not api_key:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Web chat is not configured",
@@ -325,7 +326,7 @@ class AuthFlow:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.post(
                     f"{self.settings.dify_base_url.rstrip('/')}/v1/chat-messages",
-                    headers={"Authorization": f"Bearer {self.settings.dify_api_key}"},
+                    headers={"Authorization": f"Bearer {api_key}"},
                     json=payload,
                 )
                 response.raise_for_status()

@@ -42,6 +42,8 @@ class DemoConnector:
     account_id = "account-demo-001"
     card_id = "card-demo-001"
     loan_id = "loan-demo-001"
+    demo_mobile = "593999292849"
+    demo_email = "cliente.demo@cooperativa.example"
 
     def __init__(self) -> None:
         self._idempotent_results: dict[str, tuple[str | None, ApplicationCreated]] = {}
@@ -49,6 +51,13 @@ class DemoConnector:
 
     def capabilities(self) -> Capabilities:
         return Capabilities(cards=True)
+
+    def resolve_customer_identifier(self, identifier: str) -> str | None:
+        """Resolve only the synthetic customer identifiers used by the demo."""
+
+        if identifier in {self.demo_mobile, self.demo_email}:
+            return self.customer_id
+        return None
 
     def _authorize_customer(self, customer_id: str, context: AuthContext) -> None:
         if customer_id != self.customer_id:

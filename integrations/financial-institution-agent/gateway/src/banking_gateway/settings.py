@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     connector_factory: str | None = None
     auth_mode: Literal["static-demo", "dify-user", "external-proxy"] = "static-demo"
     gateway_token: str = "local-demo-token"
+    public_gateway_token: str = "local-public-token"
     demo_subject: str = "customer-demo-001"
     verified_subject_header: str = "X-Verified-Subject"
     verified_session_state_header: str = "X-Verified-Session-State"
@@ -57,6 +58,8 @@ class Settings(BaseSettings):
     auth_customer_directory: str = ""
     dify_base_url: str | None = None
     dify_api_key: str | None = None
+    dify_public_api_key: str | None = None
+    dify_customer_api_key: str | None = None
     dify_application_user_prefix: str = "whatsapp"
     fineract_base_url: str = "https://fineract:8443/fineract-provider/api/v1"
     fineract_username: str = ""
@@ -97,6 +100,8 @@ def validate_runtime_settings(settings: Settings) -> None:
         errors.append("BANKING_INSTITUTION_CONFIG is required in production")
     if settings.gateway_token == "local-demo-token":
         errors.append("BANKING_GATEWAY_TOKEN must be replaced in production")
+    if settings.public_gateway_token == "local-public-token":
+        errors.append("BANKING_PUBLIC_GATEWAY_TOKEN must be replaced in production")
     if settings.auth_verification_mode == "local-acceptance":
         errors.append("BANKING_AUTH_VERIFICATION_MODE=local-acceptance is not allowed in production")
     if settings.auth_identity_secret == "local-auth-identity-secret":
@@ -110,6 +115,9 @@ def validate_runtime_settings(settings: Settings) -> None:
             errors.append("BANKING_UPSTREAM_BASE_URL is required for canonical-http")
         if not settings.upstream_token:
             errors.append("BANKING_UPSTREAM_TOKEN is required for canonical-http")
+    dify_keys = (settings.dify_public_api_key, settings.dify_customer_api_key, settings.dify_api_key)
+    if settings.whatsapp_enabled and settings.dify_base_url and not any(dify_keys):
+        errors.append("At least one Dify API key is required when WhatsApp is enabled")
     if errors:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(errors))
 

@@ -48,10 +48,63 @@ def test_openapi_operation_ids_match_runtime() -> None:
     assert contract == runtime
 
 
+def test_agent_openapi_contracts_are_least_privilege() -> None:
+    root = Path(__file__).resolve().parents[2]
+    public_spec = yaml.safe_load((root / "openapi-public.yaml").read_text(encoding="utf-8"))
+    customer_spec = yaml.safe_load((root / "openapi-customer.yaml").read_text(encoding="utf-8"))
+
+    public_paths = set(public_spec["paths"])
+    customer_paths = set(customer_spec["paths"])
+    assert public_paths == {
+        "/v1/capabilities",
+        "/v1/products/savings",
+        "/v1/products/loans",
+        "/v1/locations",
+    }
+    assert all(path.startswith("/v1/me") or path == "/v1/support/requests" for path in customer_paths)
+    assert not any(path.startswith("/v1/transfers") or path.startswith("/v1/payments") for path in customer_paths)
+
+
 def test_private_routes_require_bearer_token() -> None:
     response = client.get("/v1/capabilities")
     assert response.status_code == 401
     assert response.headers["content-type"].startswith("application/problem+json")
+
+
+def test_public_agent_profile_cannot_access_private_customer_data() -> None:
+    settings = Settings(
+        auth_mode="static-demo",
+        gateway_token="customer-secret",
+        public_gateway_token="public-secret",
+        environment="development",
+    )
+    verifier = TokenVerifier(settings)
+    request = SimpleNamespace(
+        headers={"Authorization": "Bearer public-secret"},
+        state=SimpleNamespace(correlation_id="corr-public"),
+    )
+
+    with pytest.raises(Exception) as error:
+        verifier.verify_private(request)
+
+    assert getattr(error.value, "status_code", None) == 403
+
+
+def test_public_capabilities_hide_private_services() -> None:
+    response = client.get(
+        "/v1/capabilities",
+        headers={"Authorization": "Bearer local-public-token"},
+    )
+
+    assert response.status_code == 200
+    capabilities = response.json()
+    assert capabilities["savingsProducts"] is True
+    assert capabilities["loanProducts"] is True
+    assert capabilities["locations"] is True
+    assert capabilities["accounts"] is False
+    assert capabilities["accountTransactions"] is False
+    assert capabilities["loans"] is False
+    assert capabilities["transfers"] is False
 
 
 def test_local_demo_publishes_commercial_capabilities() -> None:

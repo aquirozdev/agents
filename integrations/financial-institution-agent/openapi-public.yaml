@@ -1,0 +1,106 @@
+openapi: 3.0.3
+info:
+  title: Public Banking Assistant API
+  version: 1.0.0
+  description: |
+    Read-only public contract for the anonymous financial institution assistant.
+    This contract must never expose customer, account, card, loan or transaction data.
+servers:
+  - url: https://banking-gateway.example.internal
+security:
+  - bearerAuth: []
+paths:
+  /v1/capabilities:
+    get:
+      operationId: getPublicCapabilities
+      summary: Get public services enabled by the institution
+      responses:
+        '200':
+          description: Public capability matrix
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capabilities'
+  /v1/products/savings:
+    get:
+      operationId: listPublicSavingsProducts
+      summary: List public savings products
+      responses:
+        '200':
+          description: Savings products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+  /v1/products/loans:
+    get:
+      operationId: listPublicLoanProducts
+      summary: List public loan products
+      responses:
+        '200':
+          description: Loan products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+  /v1/locations:
+    get:
+      operationId: listPublicLocations
+      summary: Find branches, ATMs and agents
+      parameters:
+        - name: latitude
+          in: query
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: longitude
+          in: query
+          schema: { type: number, minimum: -180, maximum: 180 }
+        - name: type
+          in: query
+          schema: { type: string, enum: [branch, atm, agent] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 20, default: 5 }
+      responses:
+        '200':
+          description: Public locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Location'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: service-token
+  schemas:
+    Capabilities:
+      type: object
+      additionalProperties: { type: boolean }
+    Product:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        type: { type: string }
+        active: { type: boolean }
+        currency: { type: string }
+      required: [id, name, type, active]
+    Location:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [branch, atm, agent] }
+        name: { type: string }
+        address: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        openingHours: { type: string }
+      required: [id, type, name, address]

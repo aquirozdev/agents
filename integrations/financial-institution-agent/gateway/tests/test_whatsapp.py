@@ -38,6 +38,17 @@ def test_verified_whatsapp_identity_creates_short_lived_dify_assertion(tmp_path)
     assert state == "VERIFIED"
 
 
+def test_whatsapp_conversations_are_isolated_by_agent_profile(tmp_path) -> None:
+    settings = Settings(whatsapp_state_db=str(tmp_path / "state.sqlite3"))
+    channel = WhatsAppChannel(settings)
+
+    channel.save_conversation_id("593999999999", "public", "public-conversation")
+    channel.save_conversation_id("593999999999", "customer", "customer-conversation")
+
+    assert channel.get_conversation_id("593999999999", "public") == "public-conversation"
+    assert channel.get_conversation_id("593999999999", "customer") == "customer-conversation"
+
+
 def test_identity_signature_can_use_the_dedicated_broker_secret() -> None:
     settings = Settings(whatsapp_app_secret="meta-secret", whatsapp_identity_secret="broker-secret")
     channel = WhatsAppChannel(settings)

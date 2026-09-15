@@ -295,8 +295,11 @@ def with_request_fingerprint(context: AuthContext, payload: Any) -> AuthContext:
     return replace(context, request_fingerprint=hashlib.sha256(serialised.encode("utf-8")).hexdigest())
 
 
+PUBLIC_CAPABILITIES = {"savings_products", "loan_products", "locations"}
+
+
 def require_capability(capability: str, context: AuthContext) -> AuthContext:
-    if not getattr(effective_capabilities(), capability, False):
+    if not getattr(effective_capabilities(context), capability, False):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Capability '{capability}' is not enabled for this institution",
@@ -304,17 +307,18 @@ def require_capability(capability: str, context: AuthContext) -> AuthContext:
     return context
 
 
-def effective_capabilities() -> Capabilities:
+def effective_capabilities(context: AuthContext | None = None) -> Capabilities:
     """Only expose capabilities enabled by both policy and the connector."""
 
     configured = institution_profile.capabilities.model_dump()
     connector_capabilities = connector.capabilities().model_dump()
-    return Capabilities(
-        **{
-            name: bool(configured.get(name, False) and connector_capabilities.get(name, False))
-            for name in Capabilities.model_fields
-        }
-    )
+    capabilities = {
+        name: bool(configured.get(name, False) and connector_capabilities.get(name, False))
+        for name in Capabilities.model_fields
+    }
+    if context is not None and context.agent_profile == "public":
+        capabilities = {name: enabled and name in PUBLIC_CAPABILITIES for name, enabled in capabilities.items()}
+    return Capabilities(**capabilities)
 
 
 def require_idempotency(context: AuthContext) -> AuthContext:
@@ -338,8 +342,8 @@ def health(request: Request) -> Health:
 
 
 @app.get("/v1/capabilities", response_model=Capabilities, tags=["Platform"], operation_id="getCapabilities")
-def capabilities(_: Authenticated) -> Capabilities:
-    return effective_capabilities()
+def capabilities(context: Authenticated) -> Capabilities:
+    return effective_capabilities(context)
 
 
 @app.get("/v1/me", response_model=Customer, tags=["Customers"], operation_id="getCurrentCustomer")

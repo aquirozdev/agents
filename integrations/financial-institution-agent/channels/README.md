@@ -4,9 +4,9 @@ El agente no depende de un canal específico. El gateway incluye un adaptador
 opcional para WhatsApp Cloud API en `/channels/whatsapp/webhook`:
 
 ```text
-WhatsApp Cloud API -> firma Meta -> gateway -> API de aplicación Dify
-                                      |
-                         session_state=PUBLIC por defecto
+WhatsApp Cloud API -> firma Meta -> gateway -> router de sesión
+                                      |                     |
+                           agente público        agente cliente
 ```
 
 El adaptador valida la firma HMAC, deduplica `message_id`, conserva el
@@ -18,7 +18,9 @@ se reenvía a Dify. El gateway crea un reto asociado al celular del remitente y
 envía un enlace de autenticación a `/channels/auth`. La página permite validar
 el OTP y completar el segundo factor del dispositivo; al terminar, la sesión
 se registra en el mismo store de identidades que usa el adaptador de WhatsApp.
-El siguiente mensaje del cliente ya se reenvía con `session_state=VERIFIED`.
+El siguiente mensaje del cliente ya se reenvía al agente autenticado con
+`session_state=VERIFIED`. Cada perfil conserva un `conversation_id` distinto;
+el historial público nunca se reutiliza para consultas privadas.
 
 Para el canal web, el cliente debe usar el `identityAssertion` devuelto por
 `POST /channels/auth/verify-otp` como `user` de la API de aplicación Dify, con

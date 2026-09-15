@@ -7,7 +7,7 @@ from typing import Literal, cast
 
 from fastapi import HTTPException, Request, status
 
-from .ports import AuthContext
+from .ports import AgentProfile, AuthContext
 from .settings import Settings
 
 
@@ -36,21 +36,32 @@ class TokenVerifier:
 
         local_assertion_verified = False
         if self.settings.auth_mode in {"static-demo", "dify-user"}:
-            if token != self.settings.gateway_token:
+            if token == self.settings.public_gateway_token:
+                agent_profile: AgentProfile = "public"
+            elif token == self.settings.gateway_token:
+                agent_profile = "customer"
+            else:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bearer token")
             if self.settings.auth_mode == "dify-user":
                 subject = request.headers.get(self.settings.dify_identity_header)
                 if not subject:
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Dify did not provide an external end-user identity",
-                    )
-                if self.settings.environment == "production" and not self.settings.dify_identity_secret:
+                    if agent_profile == "public":
+                        subject = "public-agent"
+                    else:
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Dify did not provide an external end-user identity",
+                        )
+                if (
+                    agent_profile == "customer"
+                    and self.settings.environment == "production"
+                    and not self.settings.dify_identity_secret
+                ):
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail="Production dify-user mode requires a Dify identity signing secret",
                     )
-                if self.settings.dify_identity_secret:
+                if self.settings.dify_identity_secret and request.headers.get(self.settings.dify_identity_header):
                     signature = request.headers.get(self.settings.dify_identity_signature_header, "")
                     expected = "sha256=" + hmac.new(
                         self.settings.dify_identity_secret.encode("utf-8"),
@@ -67,14 +78,19 @@ class TokenVerifier:
         else:
             # The edge proxy must validate the JWT and strip/overwrite this
             # header. Never expose this mode directly to the public internet.
-            if token != self.settings.gateway_token:
+            if token == self.settings.public_gateway_token:
+                subject = "public-agent"
+                agent_profile = "public"
+            elif token == self.settings.gateway_token:
+                subject = request.headers.get(self.settings.verified_subject_header)
+                if not subject:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="The trusted identity proxy did not provide a verified subject",
+                    )
+                agent_profile = "customer"
+            else:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid proxy bearer token")
-            subject = request.headers.get(self.settings.verified_subject_header)
-            if not subject:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="The trusted identity proxy did not provide a verified subject",
-                )
 
         raw_session_state = (
             request.headers.get(self.settings.verified_session_state_header, "PUBLIC").upper()
@@ -90,6 +106,7 @@ class TokenVerifier:
         return AuthContext(
             subject=subject,
             institution_id=self.settings.institution_id,
+            agent_profile=agent_profile,
             session_id=request.headers.get("X-Session-ID"),
             session_state=session_state,
             correlation_id=getattr(request.state, "correlation_id", None),
@@ -122,6 +139,11 @@ class TokenVerifier:
         """Require an institution-verified session for private data."""
 
         context = self.verify(request)
+        if context.agent_profile != "customer":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This agent profile cannot access customer data",
+            )
         local_static = self.settings.environment == "development" and self.settings.auth_mode == "static-demo"
         local_authenticated = (
             self.settings.environment == "development"

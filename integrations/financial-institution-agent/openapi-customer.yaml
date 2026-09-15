@@ -1,0 +1,230 @@
+openapi: 3.0.3
+info:
+  title: Authenticated Customer Banking Assistant API
+  version: 1.0.0
+  description: |
+    Minimal read-first contract for the authenticated customer assistant.
+    The gateway resolves every /me resource from the trusted institution session.
+    The model must never supply a customer identifier as an identity proof.
+servers:
+  - url: https://banking-gateway.example.internal
+security:
+  - bearerAuth: []
+paths:
+  /v1/me:
+    get:
+      operationId: getMyProfile
+      summary: Get the authenticated customer's masked profile
+      responses:
+        '200':
+          description: Customer profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/me/accounts:
+    get:
+      operationId: listMyAccounts
+      summary: List the authenticated customer's accounts and balances
+      responses:
+        '200':
+          description: Accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Account' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/me/transactions:
+    get:
+      operationId: listMyRecentTransactions
+      summary: List up to ten recent transactions
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 10, default: 10 }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Transaction' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/me/loans:
+    get:
+      operationId: listMyLoans
+      summary: List the authenticated customer's loans and next payments
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Loans
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Loan' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/me/cards:
+    get:
+      operationId: listMyCards
+      summary: List the authenticated customer's masked cards
+      responses:
+        '200':
+          description: Cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Card' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/me/certificates:
+    get:
+      operationId: listMyCertificates
+      summary: List available banking certificates
+      responses:
+        '200':
+          description: Certificates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Certificate' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/support/requests:
+    post:
+      operationId: createCustomerSupportRequest
+      summary: Create a support or human handoff request
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupportRequest' }
+      responses:
+        '201':
+          description: Support request created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApplicationCreated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: service-token
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  responses:
+    Forbidden:
+      description: A verified institution session is required
+  schemas:
+    Money:
+      type: object
+      properties:
+        amount: { type: number }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+      required: [amount, currency]
+    Customer:
+      type: object
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        status: { type: string }
+        maskedDocument: { type: string }
+        maskedMobile: { type: string }
+        branchName: { type: string }
+      required: [id, displayName, status]
+    Account:
+      type: object
+      properties:
+        id: { type: string }
+        maskedNumber: { type: string }
+        type: { type: string, enum: [savings, checking, fixed_deposit, other] }
+        name: { type: string }
+        status: { type: string }
+        availableBalance: { $ref: '#/components/schemas/Money' }
+        currentBalance: { $ref: '#/components/schemas/Money' }
+        updatedAt: { type: string, format: date-time }
+      required: [id, type, status, availableBalance]
+    Transaction:
+      type: object
+      properties:
+        id: { type: string }
+        postedAt: { type: string, format: date-time }
+        description: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+        direction: { type: string, enum: [credit, debit] }
+        status: { type: string, enum: [posted, pending, reversed] }
+        maskedAccountNumber: { type: string }
+      required: [id, postedAt, description, amount, direction, status]
+    Loan:
+      type: object
+      properties:
+        id: { type: string }
+        productName: { type: string }
+        status: { type: string }
+        principal: { $ref: '#/components/schemas/Money' }
+        outstandingBalance: { $ref: '#/components/schemas/Money' }
+        nextPayment:
+          type: object
+          properties:
+            dueDate: { type: string, format: date }
+            totalDue: { $ref: '#/components/schemas/Money' }
+            status: { type: string }
+          required: [dueDate, totalDue, status]
+        maturityDate: { type: string, format: date }
+      required: [id, status, principal, outstandingBalance]
+    Card:
+      type: object
+      properties:
+        id: { type: string }
+        maskedNumber: { type: string }
+        type: { type: string, enum: [debit, credit, other] }
+        name: { type: string }
+        status: { type: string }
+        availableBalance: { $ref: '#/components/schemas/Money' }
+        currentBalance: { $ref: '#/components/schemas/Money' }
+      required: [id, maskedNumber, type, status]
+    Certificate:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        name: { type: string }
+        status: { type: string }
+        issuedAt: { type: string, format: date-time }
+        downloadUrl: { type: string, format: uri }
+      required: [id, type, name, status]
+    SupportRequest:
+      type: object
+      properties:
+        category: { type: string, enum: [question, complaint, fraud, technical, human_handoff] }
+        description: { type: string, minLength: 1, maxLength: 2000 }
+        consent: { type: boolean, enum: [true] }
+        preferredContact: { type: string }
+      required: [category, description, consent]
+    ApplicationCreated:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [pending, received, queued] }
+        createdAt: { type: string, format: date-time }
+        correlationId: { type: string }
+      required: [id, status, createdAt]

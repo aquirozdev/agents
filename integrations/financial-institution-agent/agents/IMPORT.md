@@ -4,18 +4,22 @@ Esta plantilla separa la experiencia conversacional del acceso al core. Para
 crear una instancia por banco o cooperativa:
 
 1. Levanta o registra el `banking gateway` privado de la institución.
-2. En Dify crea una aplicación tipo Agent/Chatflow con el prompt de
-   `cliente-financiero-ecuador.md` como instrucciones del sistema.
-3. Importa `../openapi.yaml` como proveedor de herramientas personalizado y
-   apunta el servidor al dominio privado del gateway.
-4. Configura las credenciales del proveedor usando
-   `dify-api-provider.credentials.example.json`; guarda
-   `api_key_value` en el gestor de secretos y no uses el token de la demo en
-   producción.
-5. Configura el canal y el middleware de identidad para mantener el estado
+2. En Dify crea una aplicación pública tipo Agent/Chatflow con el prompt de
+   `publico-financiero-ecuador.md` como instrucciones del sistema.
+3. Importa `../openapi-public.yaml` como proveedor de herramientas y usa
+   `BANKING_PUBLIC_GATEWAY_TOKEN` como credencial.
+4. Crea una segunda aplicación tipo Agent/Chatflow con el prompt de
+   `cliente-financiero-ecuador.md`.
+5. Importa `../openapi-customer.yaml` en esa aplicación y usa
+   `BANKING_GATEWAY_TOKEN` como credencial. Esta aplicación solo debe ser
+   invocada después de una sesión institucional verificada.
+6. Configura las credenciales del proveedor usando
+   `dify-api-provider.credentials.example.json`; guarda ambos tokens en el
+   gestor de secretos y no uses los tokens de la demo en producción.
+7. Configura el canal y el middleware de identidad para mantener el estado
    `PUBLIC|VERIFIED|HUMAN_REVIEW`; si lo entregas al prompt, úsalo solo como
    contexto conversacional, nunca como prueba de autenticación.
-6. Publica solo las capacidades que el gateway devuelve en
+8. Publica solo las capacidades que el gateway devuelve en
    `GET /v1/capabilities`; el agente no debe inventar una herramienta para una
    capacidad ausente.
 
@@ -31,8 +35,9 @@ las operaciones privadas sin ese header.
 La aplicación Dify nunca debe generar ese header como parámetro de herramienta;
 debe inyectarlo el proxy de identidad después de validar la sesión.
 
-Si el canal invoca Dify mediante la API de aplicación, activa en el proveedor
-API la opción `forward_end_user_identity=true` para contexto público. Dify
+Si el canal invoca Dify mediante la API de aplicación, configura una clave de
+aplicación diferente para público y clientes. Activa en el proveedor API la
+opción `forward_end_user_identity=true` para contexto público. Dify
 reenviará el `external_user_id` de la sesión como `X-Dify-End-User-ID` y una
 firma HMAC en `X-Dify-End-User-Signature`; configura el mismo secreto en Dify y
 `BANKING_DIFY_IDENTITY_SECRET`. Para datos privados, publica el OpenAPI detrás
@@ -49,6 +54,8 @@ proxy mantiene la sesión en `PUBLIC` aunque Dify conozca el usuario.
 ## Pruebas mínimas antes de habilitar clientes
 
 - una sesión pública no puede leer perfil, cuentas, movimientos ni créditos;
+- el agente público no tiene en su OpenAPI rutas `/v1/me`, pagos o transferencias;
+- el agente autenticado usa un `conversation_id` distinto al agente público;
 - una sesión verificada solo puede acceder a recursos de su sujeto;
 - una cédula, número de cuenta o `customerId` escrito en chat no cambia la
   identidad de la sesión;

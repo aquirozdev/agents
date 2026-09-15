@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import sqlite3
 import time
 from contextlib import closing
@@ -34,8 +35,9 @@ class WhatsAppChannel:
         db.execute("PRAGMA busy_timeout = 10000")
         db.execute("PRAGMA journal_mode = WAL")
         db.execute(
-            "CREATE TABLE IF NOT EXISTS whatsapp_conversations "
-            "(sender TEXT PRIMARY KEY, conversation_id TEXT NOT NULL)"
+            "CREATE TABLE IF NOT EXISTS whatsapp_conversations_v2 "
+            "(sender TEXT NOT NULL, agent_profile TEXT NOT NULL, conversation_id TEXT NOT NULL, "
+            "PRIMARY KEY(sender, agent_profile))"
         )
         db.execute(
             "CREATE TABLE IF NOT EXISTS whatsapp_messages "
@@ -56,8 +58,11 @@ class WhatsAppChannel:
             "WHATSAPP_ACCESS_TOKEN": self.settings.whatsapp_access_token,
             "WHATSAPP_PHONE_NUMBER_ID": self.settings.whatsapp_phone_number_id,
             "DIFY_BASE_URL": self.settings.dify_base_url,
-            "DIFY_API_KEY": self.settings.dify_api_key,
         }
+        if not any(
+            (self.settings.dify_public_api_key, self.settings.dify_customer_api_key, self.settings.dify_api_key)
+        ):
+            required["DIFY_API_KEY"] = None
         missing = [name for name, value in required.items() if not value]
         if missing:
             raise HTTPException(
@@ -125,19 +130,21 @@ class WhatsAppChannel:
             return f"{self.settings.dify_application_user_prefix}:{sender}", "PUBLIC"
         return identifier, "VERIFIED"
 
-    def get_conversation_id(self, sender: str) -> str | None:
+    def get_conversation_id(self, sender: str, agent_profile: str) -> str | None:
         with closing(self._connect()) as db:
             row = db.execute(
-                "SELECT conversation_id FROM whatsapp_conversations WHERE sender = ?", (sender,)
+                "SELECT conversation_id FROM whatsapp_conversations_v2 "
+                "WHERE sender = ? AND agent_profile = ?",
+                (sender, agent_profile),
             ).fetchone()
             return row[0] if row else None
 
-    def save_conversation_id(self, sender: str, conversation_id: str) -> None:
+    def save_conversation_id(self, sender: str, agent_profile: str, conversation_id: str) -> None:
         with closing(self._connect()) as db:
             db.execute(
-                "INSERT INTO whatsapp_conversations(sender, conversation_id) VALUES (?, ?) "
-                "ON CONFLICT(sender) DO UPDATE SET conversation_id=excluded.conversation_id",
-                (sender, conversation_id),
+                "INSERT INTO whatsapp_conversations_v2(sender, agent_profile, conversation_id) VALUES (?, ?, ?) "
+                "ON CONFLICT(sender, agent_profile) DO UPDATE SET conversation_id=excluded.conversation_id",
+                (sender, agent_profile, conversation_id),
             )
             db.commit()
 
@@ -180,14 +187,23 @@ class WhatsAppChannel:
         return messages
 
     async def ask_dify(self, sender: str, text: str, correlation_id: str | None = None) -> str:
-        if not self.settings.dify_base_url or not self.settings.dify_api_key:
+        if not self.settings.dify_base_url:
             raise RuntimeError("Dify API is not configured")
-        conversation_id = self.get_conversation_id(sender)
         dify_user, session_state = self.dify_user_identifier(sender)
+        agent_profile = "customer" if session_state == "VERIFIED" else "public"
+        conversation_id = self.get_conversation_id(sender, agent_profile)
+        api_key = (
+            (self.settings.dify_customer_api_key or self.settings.dify_api_key)
+            if agent_profile == "customer"
+            else (self.settings.dify_public_api_key or self.settings.dify_api_key)
+        )
+        if not api_key:
+            raise RuntimeError(f"Dify API key is not configured for the {agent_profile} agent")
         payload: dict[str, Any] = {
             "inputs": {
                 "channel": "whatsapp",
                 "session_state": session_state,
+                "agent_profile": agent_profile,
                 "institution_id": self.settings.institution_id,
             },
             "query": text,
@@ -196,7 +212,7 @@ class WhatsAppChannel:
         }
         if conversation_id:
             payload["conversation_id"] = conversation_id
-        headers = {"Authorization": f"Bearer {self.settings.dify_api_key}"}
+        headers = {"Authorization": f"Bearer {api_key}"}
         if correlation_id:
             headers["X-Correlation-ID"] = correlation_id
         async with httpx.AsyncClient(timeout=30) as client:
@@ -209,7 +225,7 @@ class WhatsAppChannel:
         result = response.json()
         new_conversation_id = result.get("conversation_id")
         if new_conversation_id:
-            self.save_conversation_id(sender, new_conversation_id)
+            self.save_conversation_id(sender, agent_profile, new_conversation_id)
         answer = result.get("answer")
         if not isinstance(answer, str) or not answer.strip():
             raise RuntimeError("Dify returned no answer")
@@ -271,9 +287,10 @@ def build_router(settings: Settings, auth_flow: Any | None = None) -> APIRouter:
             if not channel.claim_message(message_id):
                 continue
             try:
-                if auth_flow is not None and channel.get_identity(sender) is None:
+                normalized_text = text.strip().lower()
+                if auth_flow is not None:
                     pending = auth_flow.pending_challenge(sender, "whatsapp")
-                    if pending and text.strip().isdigit():
+                    if pending and re.fullmatch(r"\d{6}", text.strip()):
                         try:
                             auth_flow.verify_otp(pending.challenge_id, text.strip())
                             await channel.send_text(
@@ -285,7 +302,9 @@ def build_router(settings: Settings, auth_flow: Any | None = None) -> APIRouter:
                                 sender,
                                 "El código no es válido o ya expiró. Usa nuevamente el enlace seguro para solicitar otro.",
                             )
-                    else:
+                        channel.complete_message(message_id)
+                        continue
+                    if normalized_text in {"autenticar", "verificar", "iniciar sesión", "iniciar sesion"}:
                         try:
                             challenge = auth_flow.start_challenge(sender, "whatsapp", "sms")
                             await channel.send_authentication_prompt(sender, challenge.auth_url)
@@ -294,8 +313,8 @@ def build_router(settings: Settings, auth_flow: Any | None = None) -> APIRouter:
                                 sender,
                                 "No pude encontrar una relación activa con este celular. Solicita atención a la institución.",
                             )
-                    channel.complete_message(message_id)
-                    continue
+                        channel.complete_message(message_id)
+                        continue
                 answer = await channel.ask_dify(
                     sender,
                     text,

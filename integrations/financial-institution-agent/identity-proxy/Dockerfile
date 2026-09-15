@@ -9,7 +9,9 @@ COPY pyproject.toml ./
 COPY src ./src
 
 RUN pip install --no-cache-dir \
-    "fastapi>=0.115,<1" \
+    "fastapi>=0.115,<0.116" \
+    "starlette>=0.41,<0.42" \
+    "anyio>=4.4,<4.10" \
     "httpx>=0.27,<1" \
     "pydantic-settings>=2.4,<3" \
     "PyJWT[crypto]>=2.8,<3" \

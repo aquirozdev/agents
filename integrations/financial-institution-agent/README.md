@@ -11,7 +11,9 @@ WhatsApp / Web / Voz / App institucional
                  |
        Proxy OIDC, MFA y sesión
                  |
-          Dify: agente de clientes
+       Router de canal y sesión
+          |              |
+   Dify: público   Dify: clientes
                  |
        OpenAPI canónico de banca común
                  |
@@ -23,7 +25,7 @@ WhatsApp / Web / Voz / App institucional
  Finacle, core propio u otro
 ```
 
-Dify se integra una sola vez con el contrato canónico de `openapi.yaml`. Para cada institución solo se cambia el `banking gateway`, la configuración de capacidades y las políticas. Esto evita reescribir prompts y agentes cuando cambia el core.
+Dify usa dos fachadas estables sobre el mismo gateway: `openapi-public.yaml` para información general y `openapi-customer.yaml` para consultas autenticadas. El contrato canónico `openapi.yaml` se conserva para integradores y pruebas internas. Para cada institución solo se cambia el gateway, la configuración de capacidades y las políticas.
 
 La plantilla incluye una extensión opt-in en Dify para que los proveedores de
 herramientas API puedan reenviar el `external_user_id` de cada usuario como
@@ -32,8 +34,11 @@ consume desde WhatsApp, webchat u otro canal.
 
 ## Contenido
 
-- `openapi.yaml`: contrato canónico que debe implementar el gateway de cada institución.
-- `agents/cliente-financiero-ecuador.md`: agente base para atención a clientes.
+- `openapi.yaml`: contrato canónico interno que debe implementar el gateway de cada institución.
+- `openapi-public.yaml`: contrato mínimo para el agente público.
+- `openapi-customer.yaml`: contrato mínimo para el agente autenticado de clientes.
+- `agents/publico-financiero-ecuador.md`: prompt del agente público.
+- `agents/cliente-financiero-ecuador.md`: prompt del agente autenticado de clientes.
 - `agents/dify-api-provider.credentials.example.json`: configuración opt-in para propagar la identidad externa de Dify.
 - `institution.example.yaml`: configuración por institución y capacidades habilitadas.
 - `connectors/README.md`: contrato de implementación para integrar cualquier core.
@@ -51,10 +56,12 @@ consume desde WhatsApp, webchat u otro canal.
 1. Copiar `institution.example.yaml` a la configuración de la institución y cargarlo mediante `BANKING_INSTITUTION_CONFIG`.
 2. Implementar el `banking gateway` contra el core existente usando el contrato canónico.
 3. Desplegar `identity-proxy` delante del gateway y conectar el IdP, consentimiento, MFA/OTP, auditoría y handoff humano.
-4. Importar `openapi.yaml` en Dify apuntando al gateway privado.
-5. Crear el agente usando el prompt de `agents/cliente-financiero-ecuador.md`.
-6. Deshabilitar las capacidades no implementadas en la configuración; el gateway publica la intersección entre política y conector.
-7. Ejecutar pruebas de contrato, seguridad, carga, conciliación y recuperación antes de habilitar clientes reales.
+4. Crear dos aplicaciones Dify: público y clientes autenticados.
+5. Importar `openapi-public.yaml` únicamente en la aplicación pública usando `BANKING_PUBLIC_GATEWAY_TOKEN`.
+6. Importar `openapi-customer.yaml` únicamente en la aplicación de clientes usando `BANKING_GATEWAY_TOKEN` y el proxy de identidad.
+7. Configurar el router de canal para enviar conversaciones públicas y autenticadas a aplicaciones y `conversation_id` distintos.
+8. Deshabilitar las capacidades no implementadas en la configuración; el gateway publica la intersección entre política, perfil y conector.
+9. Ejecutar pruebas de contrato, seguridad, carga, conciliación y recuperación antes de habilitar clientes reales.
 
 Para comprobar el gateway de una institución:
 
@@ -80,7 +87,9 @@ El agente nunca debe llamar directamente al core ni a la base de datos. El proxy
 
 ## Capacidades del agente
 
-La plantilla está pensada para cubrir la experiencia de un canal bancario moderno:
+La plantilla está pensada para cubrir la experiencia de un canal bancario moderno. La aplicación pública solo ofrece información general; la aplicación de clientes ofrece consultas privadas; las operaciones monetarias no forman parte del contrato conversacional.
+
+El agente de clientes cubre:
 
 - consultas de perfil, cuentas, saldos y movimientos recientes;
 - consultas de tarjetas y movimientos de tarjeta, cuando la institución lo habilita;
@@ -89,12 +98,9 @@ La plantilla está pensada para cubrir la experiencia de un canal bancario moder
 - productos de ahorro y crédito;
 - consulta de préstamos, cuotas y cronogramas;
 - solicitudes de apertura y originación en estado pendiente;
-- intenciones pendientes de pagos y transferencias, cuando la institución las habilita;
-- seguimiento del estado de solicitudes e intenciones autorizadas;
-- información pública de productos, requisitos y oficinas;
 - derivación a asesor, reclamos, fraude y soporte.
 
-Transferencias, pagos, certificados, geolocalización y notificaciones son módulos opcionales. No se simulan si el gateway no los declara en `/v1/capabilities`.
+Transferencias y pagos requieren un flujo transaccional institucional separado, con step-up MFA, antifraude, límites y confirmación fuera del LLM. Certificados, geolocalización y notificaciones son módulos opcionales.
 
 ## Seguridad
 

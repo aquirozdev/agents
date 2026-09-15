@@ -25,12 +25,16 @@ from .models import (
 )
 
 
+AgentProfile = Literal["public", "customer"]
+
+
 @dataclass(frozen=True)
 class AuthContext:
     """Identity, session assurance and institution scope for connector access."""
 
     subject: str
     institution_id: str
+    agent_profile: AgentProfile = "customer"
     session_id: str | None = None
     session_state: Literal["PUBLIC", "VERIFIED", "HUMAN_REVIEW"] = "PUBLIC"
     correlation_id: str | None = None

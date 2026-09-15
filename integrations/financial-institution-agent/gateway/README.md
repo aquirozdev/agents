@@ -33,6 +33,11 @@ La demo usa el token `local-demo-token` y los siguientes datos de prueba:
 - cuenta: `account-demo-001`;
 - crédito: `loan-demo-001`.
 
+Para probar el flujo de autenticación de la demo usa el celular
+`+593 999 292 849` o el correo `cliente.demo@cooperativa.example`. En modo
+`local-acceptance` cualquier código de seis dígitos sirve únicamente para la
+demostración; no es un proveedor OTP real.
+
 Ejemplo:
 
 ```bash
@@ -70,6 +75,8 @@ BANKING_WHATSAPP_ACCESS_TOKEN='secret-manager-value'
 BANKING_WHATSAPP_PHONE_NUMBER_ID='phone-number-id'
 BANKING_DIFY_BASE_URL='https://dify.example.com'
 BANKING_DIFY_API_KEY='app-api-key'
+BANKING_DIFY_PUBLIC_API_KEY='public-app-api-key'
+BANKING_DIFY_CUSTOMER_API_KEY='customer-app-api-key'
 ```
 
 Configura en Meta el webhook `https://gateway.example.com/channels/whatsapp/webhook`.

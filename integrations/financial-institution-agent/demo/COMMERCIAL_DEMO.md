@@ -104,24 +104,24 @@ probar el chat.
 
 ## 4. Crear la aplicación en Dify
 
-1. Crea una aplicación tipo Agent o Chatflow.
-2. Usa como instrucciones el contenido de `../agents/cliente-financiero-ecuador.md`.
-3. Reemplaza `{{INSTITUTION_NAME}}` por `Cooperativa Demo` o el nombre de la
-   institución que quieras presentar.
-4. Importa `../openapi.yaml` como proveedor de herramientas OpenAPI.
-5. Reemplaza el `server.url` por el hostname público del gateway.
-6. Configura `Authorization: Bearer local-demo-token` como credencial del
-   proveedor.
-7. Publica la aplicación como Web App.
+1. Crea una aplicación pública tipo Agent o Chatflow.
+2. Usa como instrucciones `../agents/publico-financiero-ecuador.md`.
+3. Reemplaza `{{INSTITUTION_NAME}}` por `Cooperativa Demo`.
+4. Importa `../openapi-public.yaml` y configura `Authorization: Bearer local-public-token`.
+5. Crea una aplicación separada para clientes autenticados.
+6. Usa `../agents/cliente-financiero-ecuador.md` e importa `../openapi-customer.yaml`.
+7. Configura `Authorization: Bearer local-demo-token` en el proveedor autenticado.
+8. Publica ambas aplicaciones como Web Apps. El canal WhatsApp selecciona la aplicación automáticamente según la sesión.
 
 En el Compose local, el proxy SSRF de Dify debe permitir únicamente la IP o el
 dominio interno del gateway. El `docker/.env` de esta demo ya permite el
 gateway actual (`172.21.0.15` y `banking-gateway`); si se recrean los
 contenedores y cambia la IP, actualiza ese valor y recrea `ssrf_proxy`.
 
-En este modo todos los visitantes ven el mismo cliente sintético
-`customer-demo-001`. Eso es intencional: permite mostrar la experiencia sin
-exponer datos reales.
+La aplicación pública no ve ningún cliente. La aplicación autenticada usa el
+cliente sintético `customer-demo-001` solo después de completar el flujo local
+de OTP; eso permite mostrar la experiencia sin exponer datos reales.
+Para el OTP local usa `+593 999 292 849` y cualquier código de seis dígitos.
 
 ## 5. Guion de presentación
 

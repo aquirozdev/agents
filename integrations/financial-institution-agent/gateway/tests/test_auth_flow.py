@@ -4,6 +4,7 @@ import pytest
 from fastapi import HTTPException
 
 from banking_gateway.auth_flow import AuthFlow
+from banking_gateway.demo_connector import DemoConnector
 from banking_gateway.settings import Settings
 
 
@@ -77,3 +78,11 @@ def test_biometric_step_up_exposes_platform_authenticator_options(tmp_path) -> N
 
     assert options["method"] == "platform-biometric"
     assert options["publicKey"]["authenticatorSelection"]["userVerification"] == "required"
+
+
+def test_demo_connector_resolves_the_documented_demo_identity() -> None:
+    connector = DemoConnector()
+
+    assert connector.resolve_customer_identifier("593999292849") == connector.customer_id
+    assert connector.resolve_customer_identifier("cliente.demo@cooperativa.example") == connector.customer_id
+    assert connector.resolve_customer_identifier("593900000000") is None
