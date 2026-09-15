@@ -1,0 +1,62 @@
+# Configuration for one institution deployment. Copy to institution.yaml and keep
+# credentials in a secret manager or environment variables.
+template:
+  name: dify-financial-institution-agent
+  version: 0.1.0
+
+institution:
+  id: cooperative-demo
+  legal_name: Cooperativa Demo
+  country: EC
+  locale: es-EC
+  timezone: America/Guayaquil
+  base_currency: USD
+
+banking_gateway:
+  # This is the canonical API implemented by the institution connector.
+  # It is not required to be Fineract, and Dify must never connect directly to a core.
+  base_url: https://banking-gateway.example.internal
+  authentication: oauth2-client-credentials
+  audience: banking-agent-gateway
+  timeout_seconds: 15
+  connect_timeout_seconds: 5
+  max_retries: 2
+
+capabilities:
+  customer_profile: true
+  accounts: true
+  account_transactions: true
+  loans: true
+  savings_products: true
+  loan_products: true
+  loan_applications: true
+  loan_schedules: true
+  locations: true
+  support_requests: true
+  customer_applications: true
+  cards: false
+  beneficiaries: false
+  billers: false
+  operation_status: false
+  certificates: false
+  payments: false
+  transfers: false
+
+channels:
+  whatsapp: false
+  webchat: true
+  voice: false
+  human_handoff: true
+
+security:
+  require_verified_session_for_private_data: true
+  verified_session_state_header: X-Verified-Session-State
+  require_human_approval_for_money_movement: true
+  mask_account_digits: 4
+  max_transaction_results: 10
+  never_collect_in_chat:
+    - password
+    - pin
+    - cvv
+    - card_expiry
+    - otp

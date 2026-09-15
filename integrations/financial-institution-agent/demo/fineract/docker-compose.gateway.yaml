@@ -1,0 +1,28 @@
+services:
+  gateway:
+    build:
+      context: ../../gateway
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    depends_on:
+      fineract:
+        condition: service_healthy
+    environment:
+      BANKING_ENVIRONMENT: development
+      BANKING_CONNECTOR: fineract
+      BANKING_AUTH_MODE: static-demo
+      BANKING_GATEWAY_TOKEN: local-demo-token
+      BANKING_DEMO_SUBJECT: ${FINERACT_DEMO_CLIENT_ID:-1}
+      BANKING_INSTITUTION_ID: fineract-demo
+      BANKING_INSTITUTION_NAME: Fineract Demo Institution
+      BANKING_FINERACT_BASE_URL: https://fineract:8443/fineract-provider/api/v1
+      BANKING_FINERACT_USERNAME: ${FINERACT_USERNAME:-mifos}
+      BANKING_FINERACT_PASSWORD: ${FINERACT_USER_PASSWORD:-password}
+      BANKING_FINERACT_TENANT: ${FINERACT_TENANT:-default}
+      BANKING_FINERACT_VERIFY_TLS: 'false'
+    ports:
+      - '${BANKING_GATEWAY_PORT:-8080}:8080'

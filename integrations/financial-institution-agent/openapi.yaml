@@ -1,0 +1,920 @@
+openapi: 3.0.3
+info:
+  title: Canonical Banking Gateway for Dify Agents
+  version: 0.1.0
+  x-dify-identity:
+    mode: forward-end-user-identity
+    header: X-Dify-End-User-ID
+    note: Enable for dynamic end-user context. Private data additionally requires the institution proxy.
+  x-institution-security:
+    private_data_requires: external-identity-proxy
+    verified_subject_header: X-Verified-Subject
+    verified_session_state_header: X-Verified-Session-State
+    note: The proxy injects these trusted headers; the model and user must never provide them.
+  description: |
+    Core-agnostic contract for customer-facing financial institution agents.
+    The gateway behind this contract may use any banking core. Dify must not
+    connect directly to a core or its database.
+servers:
+  - url: https://banking-gateway.example.internal
+    description: Institution private gateway. Replace per deployment.
+security:
+  - bearerAuth: []
+tags:
+  - name: Platform
+  - name: Customers
+  - name: Accounts
+  - name: Loans
+  - name: Applications
+  - name: Payments
+  - name: Support
+paths:
+  /v1/health:
+    get:
+      tags: [Platform]
+      operationId: health
+      summary: Check gateway health
+      security: []
+      responses:
+        '200':
+          description: Gateway is healthy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+  /v1/capabilities:
+    get:
+      tags: [Platform]
+      operationId: getCapabilities
+      summary: Get capabilities enabled for this institution
+      description: The agent must not offer operations that are false or absent here.
+      responses:
+        '200':
+          description: Capability matrix
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Capabilities' }
+
+  /v1/me:
+    get:
+      tags: [Customers]
+      operationId: getCurrentCustomer
+      summary: Get the authenticated customer's profile
+      description: Resolves the customer from the trusted session; never ask the user for a customerId.
+      responses:
+        '200':
+          description: Authenticated customer profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/me/accounts:
+    get:
+      tags: [Accounts]
+      operationId: listCurrentCustomerAccounts
+      summary: List accounts for the authenticated customer
+      responses:
+        '200':
+          description: Accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Account' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/me/transactions:
+    get:
+      tags: [Accounts]
+      operationId: listCurrentCustomerTransactions
+      summary: List transactions for the authenticated customer
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 10, default: 10 }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Transaction' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/me/loans:
+    get:
+      tags: [Loans]
+      operationId: listCurrentCustomerLoans
+      summary: List loans for the authenticated customer
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Loans
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Loan' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/me/cards:
+    get:
+      tags: [Accounts]
+      operationId: listCurrentCustomerCards
+      summary: List cards for the authenticated customer
+      responses:
+        '200':
+          description: Cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Card' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/me/certificates:
+    get:
+      tags: [Accounts]
+      operationId: listCurrentCustomerCertificates
+      summary: List certificates for the authenticated customer
+      responses:
+        '200':
+          description: Certificates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Certificate' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/me/beneficiaries:
+    get:
+      tags: [Payments]
+      operationId: listCurrentCustomerBeneficiaries
+      summary: List beneficiaries for the authenticated customer
+      responses:
+        '200':
+          description: Beneficiaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Beneficiary' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/customers/{customerId}:
+    get:
+      tags: [Customers]
+      operationId: getCustomer
+      summary: Get an authorized customer profile
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Customer profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Customer' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/customers/{customerId}/accounts:
+    get:
+      tags: [Accounts]
+      operationId: listCustomerAccounts
+      summary: List authorized customer accounts
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Account' }
+
+  /v1/customers/{customerId}/transactions:
+    get:
+      tags: [Accounts]
+      operationId: listCustomerTransactions
+      summary: List recent authorized customer transactions
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+        - name: limit
+          in: query
+          description: Keep conversational responses short. Maximum 10 for this template.
+          schema: { type: integer, minimum: 1, maximum: 10, default: 10 }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Transaction' }
+
+  /v1/customers/{customerId}/loans:
+    get:
+      tags: [Loans]
+      operationId: listCustomerLoans
+      summary: List authorized customer loans
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Loans
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Loan' }
+
+  /v1/accounts/{accountId}:
+    get:
+      tags: [Accounts]
+      operationId: getAccount
+      summary: Get an authorized account
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '200':
+          description: Account
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Account' }
+
+  /v1/customers/{customerId}/cards:
+    get:
+      tags: [Accounts]
+      operationId: listCustomerCards
+      summary: List authorized customer cards
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Card' }
+
+  /v1/customers/{customerId}/certificates:
+    get:
+      tags: [Accounts]
+      operationId: listCustomerCertificates
+      summary: List authorized account certificates
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Certificates
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Certificate' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/customers/{customerId}/beneficiaries:
+    get:
+      tags: [Payments]
+      operationId: listCustomerBeneficiaries
+      summary: List authorized beneficiaries
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '200':
+          description: Beneficiaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Beneficiary' }
+
+  /v1/cards/{cardId}/transactions:
+    get:
+      tags: [Accounts]
+      operationId: listCardTransactions
+      summary: List recent transactions for an authorized card
+      parameters:
+        - $ref: '#/components/parameters/CardId'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 10, default: 10 }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Card transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Transaction' }
+
+  /v1/loans/{loanId}:
+    get:
+      tags: [Loans]
+      operationId: getLoan
+      summary: Get an authorized loan
+      parameters:
+        - $ref: '#/components/parameters/LoanId'
+      responses:
+        '200':
+          description: Loan detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Loan' }
+
+  /v1/loans/{loanId}/schedule:
+    get:
+      tags: [Loans]
+      operationId: getLoanSchedule
+      summary: Get the repayment schedule for an authorized loan
+      parameters:
+        - $ref: '#/components/parameters/LoanId'
+      responses:
+        '200':
+          description: Repayment schedule
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Installment' }
+
+  /v1/products/loans:
+    get:
+      tags: [Loans]
+      operationId: listLoanProducts
+      summary: List available loan products
+      responses:
+        '200':
+          description: Loan products
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Product' }
+
+  /v1/products/savings:
+    get:
+      tags: [Accounts]
+      operationId: listSavingsProducts
+      summary: List available savings products
+      responses:
+        '200':
+          description: Savings products
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Product' }
+
+  /v1/billers:
+    get:
+      tags: [Payments]
+      operationId: listBillers
+      summary: List available billers
+      responses:
+        '200':
+          description: Billers
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Biller' }
+
+  /v1/operations/{operationId}:
+    get:
+      tags: [Applications]
+      operationId: getOperationStatus
+      summary: Get the status of an authorized pending operation
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      responses:
+        '200':
+          description: Operation status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationStatus' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/applications/customers:
+    post:
+      tags: [Applications]
+      operationId: createCustomerApplication
+      summary: Create a pending customer application
+      description: Creates only a pending application. Activation requires an institution workflow.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerApplication' }
+      responses:
+        '201':
+          description: Application created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApplicationCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/applications/loans:
+    post:
+      tags: [Applications]
+      operationId: createLoanApplication
+      summary: Create a pending loan application
+      description: Creates only a pending application. Approval and disbursement are outside this agent contract.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoanApplication' }
+      responses:
+        '201':
+          description: Application created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApplicationCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/transfers:
+    post:
+      tags: [Payments]
+      operationId: createTransfer
+      summary: Create a pending transfer intent
+      description: >-
+        Creates a pending transfer intent only. The institution's approval,
+        MFA, fraud and ledger workflow must execute or reject it outside this
+        agent contract.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferRequest' }
+      responses:
+        '201':
+          description: Transfer intent created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApplicationCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/payments:
+    post:
+      tags: [Payments]
+      operationId: createPayment
+      summary: Create a pending payment intent
+      description: >-
+        Creates a pending payment intent only. The institution's approval,
+        MFA, fraud and ledger workflow must execute or reject it outside this
+        agent contract.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentRequest' }
+      responses:
+        '201':
+          description: Payment intent created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApplicationCreated' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/locations:
+    get:
+      tags: [Support]
+      operationId: listLocations
+      summary: Find institution locations
+      description: Optional capability for branches, ATMs and agents. The gateway may return an empty list if disabled.
+      parameters:
+        - name: latitude
+          in: query
+          schema: { type: number, format: double, minimum: -90, maximum: 90 }
+        - name: longitude
+          in: query
+          schema: { type: number, format: double, minimum: -180, maximum: 180 }
+        - name: type
+          in: query
+          schema: { type: string, enum: [branch, atm, agent] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 20, default: 5 }
+      responses:
+        '200':
+          description: Locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Location' }
+
+  /v1/support/requests:
+    post:
+      tags: [Support]
+      operationId: createSupportRequest
+      summary: Create a support request or human handoff
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupportRequest' }
+      responses:
+        '201':
+          description: Support request created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApplicationCreated' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Short-lived gateway token. In dify-user mode, Dify also forwards the end-user identity header.
+  parameters:
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    CardId:
+      name: cardId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    LoanId:
+      name: loanId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Stable key for safely retrying a request that creates an application or support case.
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  schemas:
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
+        correlationId: { type: string }
+    Capabilities:
+      type: object
+      properties:
+        customer_profile: { type: boolean }
+        accounts: { type: boolean }
+        account_transactions: { type: boolean }
+        loans: { type: boolean }
+        savings_products: { type: boolean }
+        loan_products: { type: boolean }
+        loan_applications: { type: boolean }
+        loan_schedules: { type: boolean }
+        locations: { type: boolean }
+        support_requests: { type: boolean }
+        customer_applications: { type: boolean }
+        cards: { type: boolean }
+        beneficiaries: { type: boolean }
+        billers: { type: boolean }
+        operation_status: { type: boolean }
+        certificates: { type: boolean }
+        payments: { type: boolean }
+        transfers: { type: boolean }
+      required:
+        - customer_profile
+        - accounts
+        - account_transactions
+        - loans
+        - savings_products
+        - loan_products
+        - loan_applications
+        - loan_schedules
+        - locations
+        - support_requests
+        - customer_applications
+        - cards
+        - beneficiaries
+        - billers
+        - operation_status
+        - certificates
+        - payments
+        - transfers
+      example:
+        customer_profile: true
+        accounts: true
+        account_transactions: true
+        loans: true
+        savings_products: true
+        loan_products: true
+        loan_applications: true
+        loan_schedules: true
+        locations: true
+        support_requests: true
+        customer_applications: true
+        cards: false
+        beneficiaries: false
+        billers: false
+        operation_status: false
+        certificates: false
+        payments: false
+        transfers: false
+    Money:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount: { type: number, format: double }
+        currency: { type: string, minLength: 3, maxLength: 3 }
+    Customer:
+      type: object
+      required: [id, displayName, status]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        status: { type: string }
+        maskedDocument: { type: string }
+        maskedMobile: { type: string }
+        branchName: { type: string }
+    Account:
+      type: object
+      required: [id, type, status, availableBalance]
+      properties:
+        id: { type: string }
+        maskedNumber: { type: string }
+        type: { type: string, enum: [savings, checking, fixed_deposit, other] }
+        name: { type: string }
+        status: { type: string }
+        availableBalance: { $ref: '#/components/schemas/Money' }
+        currentBalance: { $ref: '#/components/schemas/Money' }
+        updatedAt: { type: string, format: date-time }
+    Card:
+      type: object
+      required: [id, maskedNumber, type, status]
+      properties:
+        id: { type: string }
+        maskedNumber: { type: string }
+        type: { type: string, enum: [debit, credit, other] }
+        name: { type: string }
+        status: { type: string }
+        availableBalance: { $ref: '#/components/schemas/Money' }
+        currentBalance: { $ref: '#/components/schemas/Money' }
+        expiryMonth: { type: integer, minimum: 1, maximum: 12 }
+        expiryYear: { type: integer, minimum: 2000, maximum: 2200 }
+    Certificate:
+      type: object
+      required: [id, type, name, status]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [account_ownership, balance, tax, other] }
+        name: { type: string }
+        status: { type: string, enum: [available, processing, expired] }
+        issuedAt: { type: string, format: date-time }
+        downloadUrl: { type: string, format: uri }
+    Beneficiary:
+      type: object
+      required: [id, name, type, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string }
+        maskedAccount: { type: string }
+        status: { type: string }
+    Biller:
+      type: object
+      required: [id, name, category, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        status: { type: string }
+    Transaction:
+      type: object
+      required: [id, postedAt, description, amount, direction, status]
+      properties:
+        id: { type: string }
+        postedAt: { type: string, format: date-time }
+        description: { type: string }
+        amount: { $ref: '#/components/schemas/Money' }
+        direction: { type: string, enum: [credit, debit] }
+        status: { type: string, enum: [posted, pending, reversed] }
+        maskedAccountNumber: { type: string }
+    Loan:
+      type: object
+      required: [id, status, principal, outstandingBalance]
+      properties:
+        id: { type: string }
+        productName: { type: string }
+        status: { type: string }
+        principal: { $ref: '#/components/schemas/Money' }
+        outstandingBalance: { $ref: '#/components/schemas/Money' }
+        nextPayment: { $ref: '#/components/schemas/Installment' }
+        maturityDate: { type: string, format: date }
+    Installment:
+      type: object
+      required: [dueDate, totalDue, status]
+      properties:
+        number: { type: integer, minimum: 1 }
+        dueDate: { type: string, format: date }
+        principalDue: { $ref: '#/components/schemas/Money' }
+        interestDue: { $ref: '#/components/schemas/Money' }
+        feesDue: { $ref: '#/components/schemas/Money' }
+        totalDue: { $ref: '#/components/schemas/Money' }
+        status: { type: string, enum: [upcoming, due, overdue, paid] }
+    Product:
+      type: object
+      required: [id, name, type, active]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        type: { type: string }
+        active: { type: boolean }
+        currency: { type: string }
+    CustomerApplication:
+      type: object
+      required: [fullName, consent, contact]
+      properties:
+        fullName: { type: string, minLength: 2, maxLength: 200 }
+        contact: { type: string, minLength: 3, maxLength: 100 }
+        externalReference: { type: string, maxLength: 128 }
+        consent:
+          type: object
+          required: [accepted, version]
+          properties:
+            accepted: { type: boolean, enum: [true] }
+            version: { type: string }
+        metadata: { type: object, additionalProperties: true }
+    LoanApplication:
+      type: object
+      required: [customerId, productId, requestedAmount, term, consent]
+      properties:
+        customerId: { type: string }
+        productId: { type: string }
+        requestedAmount: { $ref: '#/components/schemas/Money' }
+        term: { type: integer, minimum: 1, maximum: 600 }
+        purpose: { type: string, maxLength: 500 }
+        consent:
+          type: object
+          required: [accepted, version]
+          properties:
+            accepted: { type: boolean, enum: [true] }
+            version: { type: string }
+        metadata: { type: object, additionalProperties: true }
+    TransferRequest:
+      type: object
+      required: [sourceAccountId, beneficiaryId, amount, consent]
+      properties:
+        sourceAccountId: { type: string, minLength: 1, maxLength: 128 }
+        beneficiaryId: { type: string, minLength: 1, maxLength: 128 }
+        amount: { $ref: '#/components/schemas/Money' }
+        purpose: { type: string, maxLength: 500 }
+        consent:
+          type: object
+          required: [accepted, version]
+          properties:
+            accepted: { type: boolean, enum: [true] }
+            version: { type: string }
+        metadata: { type: object, additionalProperties: true }
+    PaymentRequest:
+      type: object
+      required: [sourceAccountId, billerId, amount, consent]
+      properties:
+        sourceAccountId: { type: string, minLength: 1, maxLength: 128 }
+        billerId: { type: string, minLength: 1, maxLength: 128 }
+        amount: { $ref: '#/components/schemas/Money' }
+        reference: { type: string, maxLength: 200 }
+        consent:
+          type: object
+          required: [accepted, version]
+          properties:
+            accepted: { type: boolean, enum: [true] }
+            version: { type: string }
+        metadata: { type: object, additionalProperties: true }
+    Location:
+      type: object
+      required: [id, type, name, address]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [branch, atm, agent] }
+        name: { type: string }
+        address: { type: string }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        openingHours: { type: string }
+    SupportRequest:
+      type: object
+      required: [category, description, consent]
+      properties:
+        category: { type: string, enum: [question, complaint, fraud, technical, human_handoff] }
+        description: { type: string, minLength: 1, maxLength: 2000 }
+        consent: { type: boolean, enum: [true] }
+        preferredContact: { type: string, maxLength: 100 }
+    ApplicationCreated:
+      type: object
+      required: [id, status, createdAt]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [pending, received, queued] }
+        createdAt: { type: string, format: date-time }
+        correlationId: { type: string }
+    OperationStatus:
+      type: object
+      required: [id, kind, status, createdAt]
+      properties:
+        id: { type: string }
+        kind:
+          {
+            type: string,
+            enum: [customer_application, loan_application, transfer, payment, support],
+          }
+        status: { type: string, enum: [pending, received, approved, rejected, completed, failed] }
+        detail: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [type, title, status, correlationId]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        correlationId: { type: string }
+  responses:
+    Unauthorized:
+      description: Missing or invalid gateway authentication
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: The idempotency key was reused with a different request body
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: The session is not authorized for this resource
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Error' }

@@ -62,6 +62,15 @@
 
 Dify is an open-source LLM app development platform. Its intuitive interface combines AI workflow, RAG pipeline, agent capabilities, model management, observability features (including [Opik](https://www.comet.com/docs/opik/integrations/dify), [Langfuse](https://docs.langfuse.com), and [Arize Phoenix](https://docs.arize.com/phoenix)) and more, letting you quickly go from prototype to production. Here's a list of the core features:
 
+## Financial institution agent template
+
+This repository includes a core-agnostic template for deploying customer
+agents for banks and cooperatives: [financial-institution-agent](integrations/financial-institution-agent/).
+It provides the canonical OpenAPI contract, a reference gateway, the Ecuador
+customer-agent prompt, an optional OIDC identity proxy, WhatsApp Cloud API
+support, and an isolated Fineract demo. Institution-specific cores are
+integrated through a connector port without exposing the core directly to Dify.
+
 ## Quick start
 
 > Before installing Dify, make sure your machine meets the following minimum system requirements:

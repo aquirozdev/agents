@@ -1,0 +1,59 @@
+# Optional demo core only. The reusable agent template does not depend on this file.
+name: banking-agent-fineract-demo
+
+services:
+  db:
+    image: postgres:18.3
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: ${FINERACT_POSTGRES_PASSWORD:-change-me-local-only}
+      POSTGRES_DB: postgres
+      FINERACT_DB_USER: postgres
+      FINERACT_DB_PASS: ${FINERACT_POSTGRES_PASSWORD:-change-me-local-only}
+      FINERACT_TENANTS_DB_NAME: fineract_tenants
+      FINERACT_TENANT_DEFAULT_DB_NAME: fineract_default
+    volumes:
+      - fineract-demo-db:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/01-fineract-init.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U root -d postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  fineract:
+    image: apache/fineract:${FINERACT_VERSION:-1.15.0}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      FINERACT_NODE_ID: 1
+      FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME: org.postgresql.Driver
+      FINERACT_HIKARI_JDBC_URL: jdbc:postgresql://db:5432/fineract_tenants
+      FINERACT_HIKARI_USERNAME: postgres
+      FINERACT_HIKARI_PASSWORD: ${FINERACT_POSTGRES_PASSWORD:-change-me-local-only}
+      FINERACT_DEFAULT_TENANTDB_PORT: 5432
+      FINERACT_DEFAULT_TENANTDB_UID: postgres
+      FINERACT_DEFAULT_TENANTDB_PWD: ${FINERACT_POSTGRES_PASSWORD:-change-me-local-only}
+      FINERACT_DEFAULT_TENANTDB_IDENTIFIER: default
+      FINERACT_DEFAULT_TENANTDB_NAME: fineract_default
+      FINERACT_DEFAULT_TENANTDB_DESCRIPTION: Dify Banking Agent Demo Tenant
+      FINERACT_DEFAULT_TENANTDB_HOSTNAME: db
+      FINERACT_DEFAULT_MASTER_PASSWORD: fineract
+      FINERACT_SERVER_SSL_ENABLED: 'true'
+      FINERACT_MANAGEMENT_ENDPOINT_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+      FINERACT_REMOTE_JOB_MESSAGE_HANDLER_SPRING_EVENTS_ENABLED: 'true'
+      FINERACT_INSECURE_HTTP_CLIENT: 'true'
+      FINERACT_CONTENT_FILESYSTEM_ROOT_FOLDER: /tmp
+      SPRING_PROFILES_ACTIVE: test,diagnostics
+    ports:
+      - '${FINERACT_PORT:-8443}:8443'
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z localhost 8443']
+      interval: 10s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+
+volumes:
+  fineract-demo-db:
