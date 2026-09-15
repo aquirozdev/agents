@@ -76,6 +76,7 @@ def test_api_tool_provider_from_db_and_parse_tool_bundle() -> None:
     )
     assert controller.provider_type == ToolProviderType.API
     assert any(c.name == "api_key_value" for c in controller.entity.credentials_schema)
+    assert any(c.name == "forward_end_user_identity" for c in controller.entity.credentials_schema)
 
     tool = controller._parse_tool_bundle(_db_provider().tools[0])
     assert isinstance(tool, ApiTool)
@@ -89,7 +90,13 @@ def test_api_tool_provider_from_db_query_auth_and_none_auth() -> None:
     assert any(c.name == "api_key_query_param" for c in query_controller.entity.credentials_schema)
 
     none_controller = ApiToolProviderController.from_db(_db_provider(), ApiProviderAuthType.NONE, session=MagicMock())
-    assert [c.name for c in none_controller.entity.credentials_schema] == ["auth_type"]
+    assert [c.name for c in none_controller.entity.credentials_schema] == [
+        "auth_type",
+        "forward_end_user_identity",
+        "identity_header_name",
+        "identity_signing_secret",
+        "identity_signature_header",
+    ]
 
 
 def test_api_tool_provider_load_get_tools_and_get_tool(

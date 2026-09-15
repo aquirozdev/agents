@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -6,6 +8,7 @@ from typing import Any, Union, override
 from urllib.parse import urlencode
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from core.helper import ssrf_proxy
@@ -15,6 +18,7 @@ from core.tools.entities.tool_bundle import ApiToolBundle
 from core.tools.entities.tool_entities import ToolEntity, ToolInvokeMessage, ToolProviderType
 from core.tools.errors import ToolInvokeError, ToolParameterValidationError, ToolProviderCredentialValidationError
 from graphon.file.file_manager import download
+from models.model import EndUser
 
 API_TOOL_DEFAULT_TIMEOUT = (
     int(getenv("API_TOOL_DEFAULT_CONNECT_TIMEOUT", "10")),
@@ -305,6 +309,46 @@ class ApiTool(Tool):
         )
         return response
 
+    def _forward_end_user_identity(self, session: Session, user_id: str, headers: dict[str, Any]) -> None:
+        """Optionally propagate the external end-user identity to an API tool.
+
+        API tools normally use only provider credentials. Institution gateways
+        can opt in so a shared Dify app does not call every customer as the
+        same subject. The value comes from Dify's EndUser record, never from
+        LLM-generated tool parameters.
+        """
+
+        credentials = self.runtime.credentials if self.runtime else {}
+        if not credentials.get("forward_end_user_identity"):
+            return
+        header_name = credentials.get("identity_header_name", "X-Dify-End-User-ID")
+        if (
+            not isinstance(header_name, str)
+            or not header_name.strip()
+            or any(character in header_name for character in "\r\n")
+        ):
+            raise ToolProviderCredentialValidationError("identity_header_name must be a valid header name")
+        external_user_id = session.scalar(select(EndUser.external_user_id).where(EndUser.id == user_id))
+        if external_user_id:
+            if any(character in external_user_id for character in "\r\n"):
+                raise ToolProviderCredentialValidationError("external end-user identity contains invalid characters")
+            headers[header_name] = external_user_id
+            signing_secret = credentials.get("identity_signing_secret")
+            if signing_secret:
+                signature_header = credentials.get("identity_signature_header", "X-Dify-End-User-Signature")
+                if (
+                    not isinstance(signature_header, str)
+                    or not signature_header.strip()
+                    or any(character in signature_header for character in "\r\n")
+                ):
+                    raise ToolProviderCredentialValidationError("identity_signature_header must be a valid header name")
+                signature = hmac.new(
+                    str(signing_secret).encode("utf-8"),
+                    external_user_id.encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
+                headers[signature_header] = f"sha256={signature}"
+
     def _convert_body_property_any_of(
         self, property: dict[str, Any], value: Any, any_of: list[dict[str, Any]], max_recursive=10
     ):
@@ -394,6 +438,7 @@ class ApiTool(Tool):
         response: httpx.Response | str = ""
         # assemble request
         headers = self.assembling_request(tool_parameters)
+        self._forward_end_user_identity(session, user_id, headers)
 
         # do http request
         response = self.do_http_request(self.api_bundle.server_url, self.api_bundle.method, headers, tool_parameters)

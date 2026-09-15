@@ -107,6 +107,52 @@ class ApiToolProviderController(ToolProviderController[ToolProviderEntity, ApiTo
         elif auth_type == ApiProviderAuthType.NONE:
             pass
 
+        # Opt-in identity propagation for institution gateways. The API tool
+        # can forward the end user's external identifier at invocation time;
+        # credentials remain static and the feature is disabled by default.
+        credentials_schema = [
+            *credentials_schema,
+            ProviderConfig(
+                name="forward_end_user_identity",
+                required=False,
+                default=False,
+                type=ProviderConfigType.BOOLEAN,
+                help=I18nObject(
+                    en_US="Forward the end user's external identity to the API",
+                    zh_Hans="将最终用户外部身份转发到 API",
+                ),
+            ),
+            ProviderConfig(
+                name="identity_header_name",
+                required=False,
+                default="X-Dify-End-User-ID",
+                type=ProviderConfigType.TEXT_INPUT,
+                help=I18nObject(
+                    en_US="Header used for the forwarded external identity",
+                    zh_Hans="转发外部身份使用的请求头",
+                ),
+            ),
+            ProviderConfig(
+                name="identity_signing_secret",
+                required=False,
+                type=ProviderConfigType.SECRET_INPUT,
+                help=I18nObject(
+                    en_US="Optional HMAC secret for signing the forwarded identity",
+                    zh_Hans="用于签名转发身份的可选 HMAC 密钥",
+                ),
+            ),
+            ProviderConfig(
+                name="identity_signature_header",
+                required=False,
+                default="X-Dify-End-User-Signature",
+                type=ProviderConfigType.TEXT_INPUT,
+                help=I18nObject(
+                    en_US="Header used for the forwarded identity signature",
+                    zh_Hans="转发身份签名使用的请求头",
+                ),
+            ),
+        ]
+
         user = db_provider.user(session=session)
         user_name = user.name if user else ""
 

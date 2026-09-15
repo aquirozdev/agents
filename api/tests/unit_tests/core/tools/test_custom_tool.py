@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 from types import SimpleNamespace
 from typing import Any
 
@@ -94,6 +96,56 @@ def test_assembling_request_auth_header_assembly():
 
     tool.runtime.credentials = {"auth_type": "api_key_query", "api_key_value": "abc"}
     assert tool.assembling_request(parameters={}) == {}
+
+
+def test_forward_end_user_identity_is_opt_in():
+    tool = _build_tool()
+    tool.runtime.credentials = {
+        "auth_type": "api_key_header",
+        "api_key_value": "gateway-token",
+        "forward_end_user_identity": True,
+        "identity_header_name": "X-Dify-End-User-ID",
+        "identity_signing_secret": "identity-secret",
+    }
+
+    class IdentitySession:
+        def scalar(self, _statement):
+            return "whatsapp:+593999999999"
+
+    headers = tool.assembling_request(parameters={})
+    tool._forward_end_user_identity(IdentitySession(), "dify-end-user-id", headers)  # type: ignore[arg-type]
+    assert headers["X-Dify-End-User-ID"] == "whatsapp:+593999999999"
+    expected = hmac.new(b"identity-secret", b"whatsapp:+593999999999", hashlib.sha256).hexdigest()
+    assert headers["X-Dify-End-User-Signature"] == f"sha256={expected}"
+
+
+def test_forward_end_user_identity_does_not_send_by_default():
+    tool = _build_tool()
+    headers = tool.assembling_request(parameters={})
+
+    class IdentitySession:
+        def scalar(self, _statement):
+            raise AssertionError("identity lookup must stay disabled by default")
+
+    tool._forward_end_user_identity(IdentitySession(), "dify-end-user-id", headers)  # type: ignore[arg-type]
+    assert "X-Dify-End-User-ID" not in headers
+
+
+def test_forward_end_user_identity_rejects_header_injection():
+    tool = _build_tool()
+    tool.runtime.credentials = {
+        "auth_type": "api_key_header",
+        "api_key_value": "gateway-token",
+        "forward_end_user_identity": True,
+    }
+
+    class IdentitySession:
+        def scalar(self, _statement):
+            return "customer\r\nX-Injected: true"
+
+    headers = tool.assembling_request(parameters={})
+    with pytest.raises(ToolProviderCredentialValidationError, match="invalid characters"):
+        tool._forward_end_user_identity(IdentitySession(), "dify-end-user-id", headers)  # type: ignore[arg-type]
 
 
 def test_assembling_request_runtime_auth_errors():
